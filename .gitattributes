@@ -1,0 +1,18 @@
+# Normalize line endings: LF in the repository, native on checkout
+* text=auto eol=lf
+
+# Shell scripts must use LF even on Windows
+*.sh text eol=lf
+justfile text eol=lf
+Makefile text eol=lf
+
+# Go files use LF
+*.go text eol=lf
+
+# SQL files use LF
+*.sql text eol=lf
+
+# Binary files are not touched
+*.exe binary
+*.png binary
+*.jpg binary
