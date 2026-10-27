@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/agentops-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Download dependencies
+        run: go mod download
+      - name: Vet
+        run: go vet ./...
+      - name: Format check
+        run: test -z "$(gofmt -l .)"
+      - name: Test
+        run: go test ./... -race -count=1
+      - name: Build all binaries
+        run: |
+          go build -o /tmp/api    ./cmd/api
+          go build -o /tmp/worker ./cmd/worker
+          go build -o /tmp/cli    ./cmd/cli
+
+  evals-engine:
+    name: Evals Engine (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/evals-engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest

@@ -1,0 +1,24 @@
+# Binaries
+bin/
+*.test
+*.out
+
+# Local tooling (do not commit the just binary)
+just.exe
+
+# Environment
+.env
+.env.local
+
+# IDE - ignore workspace-specific files, keep shared settings
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
