@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,10 +9,9 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
+	_ "github.com/lib/pq"
 	"github.com/ravilushqa/otelgqlgen"
 	"github.com/redis/go-redis/v9"
-	_ "github.com/lib/pq"
-	"database/sql"
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph"
@@ -38,6 +38,27 @@ func main() {
 		log.Fatalf("open database: %v", err)
 	}
 	defer database.Close()
+
+	// Verify that the database role cannot bypass Row-Level Security.
+	// A superuser or a role with BYPASSRLS would silently disable tenant
+	// isolation, which is the most important security property of the system.
+	// Failing fast here is the difference between "works on my machine" and
+	// "fails safe when the DBA misconfigures the role".
+	var (
+		currentUser string
+		canBypass   bool
+	)
+	err = database.QueryRow(`
+		SELECT current_user,
+		       (SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user)
+	`).Scan(&currentUser, &canBypass)
+	if err != nil {
+		log.Fatalf("verify database role: %v", err)
+	}
+	if currentUser == "postgres" || canBypass {
+		log.Fatalf("SECURITY: database role %q can bypass RLS. Use a non-superuser role without BYPASSRLS.", currentUser)
+	}
+	log.Printf("database role verified: %s (RLS enforced)", currentUser)
 
 	rdb := redis.NewClient(&redis.Options{Addr: rdbAddr})
 	defer rdb.Close()
