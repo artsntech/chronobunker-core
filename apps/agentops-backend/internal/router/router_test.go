@@ -9,6 +9,8 @@ import (
 	"testing"
 	"runtime"
 	"path/filepath"
+	"fmt"
+	"time"
 
 	_ "github.com/lib/pq"
 
@@ -76,15 +78,17 @@ func TestRouterRecordsCostEvent(t *testing.T) {
 		t.Fatalf("new router: %v", err)
 	}
 
+	sessionID := fmt.Sprintf("sess-cost-%d", time.Now().UnixNano())
+
 	ctx := db.WithTenantID(context.Background(), tenantAcme)
-	_, _, err = r.Route(ctx, "triage", "hello", "sess-cost-test")
+	_, _, err = r.Route(ctx, "triage", "hello", sessionID)
 	if err != nil {
 		t.Fatalf("route: %v", err)
 	}
 
 	var count int
 	err = db.WithTenantTx(ctx, database, func(tx *sql.Tx) error {
-		return tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM cost_events WHERE session_id = $1`, "sess-cost-test").Scan(&count)
+		return tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM cost_events WHERE session_id = $1`, sessionID).Scan(&count)
 	})
 	if err != nil {
 		t.Fatalf("query cost_events: %v", err)
