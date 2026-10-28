@@ -20,21 +20,10 @@ check-infra:
 
 # Apply all SQL migrations in order
 db-migrate: check-infra
-    @echo "Applying database migrations..."
-    @for f in db/migrations/*.sql; do \
-        echo "  -> $$f"; \
-        psql "postgres://{{env_var_or_default('CHRONO_DB_USER', 'chrono_app')}}:{{env_var_or_default('CHRONO_DB_PASSWORD', '')}}@{{env_var_or_default('CHRONO_DB_HOST', 'localhost')}}:{{env_var_or_default('CHRONO_DB_PORT', '5432')}}/{{env_var_or_default('CHRONO_DB_NAME', 'chronobunker')}}?sslmode={{env_var_or_default('CHRONO_DB_SSLMODE', 'disable')}}" -f "$$f" || exit 1; \
-    done
-    @echo "Migrations applied."
+    @bash scripts/db_migrate.sh
 
-# Load seed data (development only)
 db-seed: check-infra
-    @echo "Loading seed data..."
-    @for f in db/seed/*.sql; do \
-        echo "  -> $$f"; \
-        psql "postgres://{{env_var_or_default('CHRONO_DB_USER', 'chrono_app')}}:{{env_var_or_default('CHRONO_DB_PASSWORD', '')}}@{{env_var_or_default('CHRONO_DB_HOST', 'localhost')}}:{{env_var_or_default('CHRONO_DB_PORT', '5432')}}/{{env_var_or_default('CHRONO_DB_NAME', 'chronobunker')}}?sslmode={{env_var_or_default('CHRONO_DB_SSLMODE', 'disable')}}" -f "$$f" || exit 1; \
-    done
-    @echo "Seed data loaded."
+    @bash scripts/db_seed.sh
 
 # Compile all three binaries
 build:
