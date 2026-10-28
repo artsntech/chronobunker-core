@@ -1,0 +1,42 @@
+schema:
+  - internal/transport/graph/schema.graphqls
+
+exec:
+  filename: internal/transport/graph/generated.go
+  package: graph
+
+model:
+  filename: internal/transport/graph/model/models_gen.go
+  package: model
+
+#resolver:
+#  layout: follow-schema
+#  dir: internal/transport/graph
+#  package: graph
+#  filename_template: "{name}.resolvers.go"
+#  omit_gqlgen_file_notice: true
+#  preserve_resolver: true
+
+autobind:
+  - github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent
+
+models:
+  Agent:
+    model: github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent.Agent
+    fields:
+      tenantId:
+        fieldName: TenantID
+      healthScore:
+        fieldName: HealthScore
+      allowedTools:
+        fieldName: AllowedTools
+      targetModel:
+        fieldName: TargetModel
+      createdAt:
+        fieldName: CreatedAt
+      updatedAt:
+        fieldName: UpdatedAt
+  AgentStatus:
+    model: github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent.Status
+  Time:
+    model: github.com/99designs/gqlgen/graphql.Time

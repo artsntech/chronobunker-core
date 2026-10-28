@@ -58,3 +58,7 @@ clean:
     @echo "Cleaning compiled binaries..."
     @rm -rf bin/
     @echo "Clean complete."
+
+
+graphql-generate:
+    @cd apps/agentops-backend && go run github.com/99designs/gqlgen generate

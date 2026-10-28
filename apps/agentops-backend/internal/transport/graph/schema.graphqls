@@ -1,0 +1,42 @@
+scalar Time
+
+enum AgentStatus {
+  DRAFT
+  CANARY
+  PRODUCTION
+  KILLED
+}
+
+type Agent {
+  id: ID!
+  tenantId: ID!
+  name: String!
+  department: String!
+  status: AgentStatus!
+  healthScore: Float!
+  allowedTools: [String!]!
+  targetModel: String!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+input CreateAgentInput {
+  name: String!
+  department: String!
+  targetModel: String
+}
+
+input UpdateAgentStatusInput {
+  id: ID!
+  status: AgentStatus!
+}
+
+type Query {
+  agents: [Agent!]!
+  agent(id: ID!): Agent
+}
+
+type Mutation {
+  createAgent(input: CreateAgentInput!): Agent!
+  updateAgentStatus(input: UpdateAgentStatusInput!): Agent!
+}
