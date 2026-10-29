@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,6 +18,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	_ "github.com/lib/pq"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/ravilushqa/otelgqlgen"
 	"github.com/redis/go-redis/v9"
 
@@ -28,6 +30,16 @@ import (
 )
 
 func main() {
+	// Structured logging: JSON in production, text in development.
+	var logHandler slog.Handler
+	if os.Getenv("CHRONO_ENV") == "production" {
+		logHandler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	} else {
+		logHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
+	}
+	logger := slog.New(logHandler)
+	slog.SetDefault(logger)
+
 	dbURL := os.Getenv("CHRONO_DB_URL")
 	if dbURL == "" {
 		log.Fatal("CHRONO_DB_URL is required")
@@ -37,26 +49,21 @@ func main() {
 		log.Fatal("CHRONO_REDIS_ADDR is required")
 	}
 	pubKeyPath := os.Getenv("CHRONO_JWT_PUBLIC_KEY_PATH")
-if pubKeyPath == "" {
-	log.Fatal("CHRONO_JWT_PUBLIC_KEY_PATH is required")
-}
-if abs, err := filepath.Abs(pubKeyPath); err == nil {
-	pubKeyPath = abs
-}
+	if pubKeyPath == "" {
+		log.Fatal("CHRONO_JWT_PUBLIC_KEY_PATH is required")
+	}
+	if abs, err := filepath.Abs(pubKeyPath); err == nil {
+		pubKeyPath = abs
+	}
 
-	// The routing policy path is configurable so that the binary can be run
-	// from any working directory. Defaults to policies/routing.yaml relative
-	// to the working directory.
 	policyPath := os.Getenv("CHRONO_ROUTING_POLICY_PATH")
 	if policyPath == "" {
 		policyPath = "policies/routing.yaml"
 	}
-	// Resolve to an absolute path so that the router works regardless of
-	// where the binary is invoked from.
 	if abs, err := filepath.Abs(policyPath); err == nil {
 		policyPath = abs
 	}
-
+	log.Printf("JWT public key: %s", pubKeyPath)
 	log.Printf("routing policy: %s", policyPath)
 
 	database, err := sql.Open("postgres", dbURL)
@@ -65,13 +72,11 @@ if abs, err := filepath.Abs(pubKeyPath); err == nil {
 	}
 	defer database.Close()
 
-	// Connection pool tuning.
 	database.SetMaxOpenConns(25)
 	database.SetMaxIdleConns(25)
 	database.SetConnMaxLifetime(5 * time.Minute)
 	database.SetConnMaxIdleTime(1 * time.Minute)
 
-	// Verify the role cannot bypass RLS.
 	var (
 		currentUser string
 		canBypass   bool
@@ -103,50 +108,48 @@ if abs, err := filepath.Abs(pubKeyPath); err == nil {
 		log.Fatalf("init router: %v", err)
 	}
 
-	// Build the GraphQL server manually so that introspection can be
-// conditionally enabled. NewDefaultServer always enables introspection.
-es := graph.NewExecutableSchema(graph.Config{
-	Resolvers: &graph.Resolver{
-		AgentRepo: agent.NewRepository(database),
-		Router:    modelRouter,
-		DB:        database,
-	},
-})
+	es := graph.NewExecutableSchema(graph.Config{
+		Resolvers: &graph.Resolver{
+			AgentRepo: agent.NewRepository(database),
+			Router:    modelRouter,
+			DB:        database,
+		},
+	})
 
-srv := handler.New(es)
-srv.AddTransport(transport.Options{})
-srv.AddTransport(transport.POST{})
-srv.AddTransport(transport.GET{})
+	srv := handler.New(es)
+	srv.AddTransport(transport.Options{})
+	srv.AddTransport(transport.POST{})
+	srv.AddTransport(transport.GET{})
 
-// Introspection is only enabled in non-production environments.
-if os.Getenv("CHRONO_ENV") != "production" {
-	srv.Use(extension.Introspection{})
-}
+	if os.Getenv("CHRONO_ENV") != "production" {
+		srv.Use(extension.Introspection{})
+	}
 
-srv.Use(extension.FixedComplexityLimit(200))
-srv.Use(otelgqlgen.Middleware())
+	srv.Use(extension.FixedComplexityLimit(200))
+	srv.Use(otelgqlgen.Middleware())
 
 	graphqlHandler := auth.Middleware(rateLimit.Middleware(srv))
 
-	ipRateLimit := middleware.NewIPRateLimit(rdb, 20, 10*time.Second) // 20 req per 10s per IP
+	ipRateLimit := middleware.NewIPRateLimit(rdb, 20, 10*time.Second)
 
 	mux := http.NewServeMux()
 	if os.Getenv("CHRONO_ENV") != "production" {
-    mux.Handle("/", ipRateLimit.Middleware(playground.Handler("ChronoBunker", "/query")))
-}
+		mux.Handle("/", ipRateLimit.Middleware(playground.Handler("ChronoBunker", "/query")))
+		mux.Handle("/playground", ipRateLimit.Middleware(playground.Handler("ChronoBunker", "/query")))
+		mux.Handle("/playground/", ipRateLimit.Middleware(playground.Handler("ChronoBunker", "/query")))
+	}
 	mux.Handle("/query", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		graphqlHandler.ServeHTTP(w, r)
 	}))
-mux.Handle("/playground", ipRateLimit.Middleware(playground.Handler("ChronoBunker", "/query")))
-mux.Handle("/playground/", ipRateLimit.Middleware(playground.Handler("ChronoBunker", "/query")))
 	mux.Handle("/healthz", ipRateLimit.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("healthz handler called: path=%q", r.URL.Path)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})))
 
-	handlerWithHeaders := middleware.SecurityHeaders(mux)
+	handlerWithHeaders := middleware.SecurityHeaders(
+		middleware.Logging(logger)(mux),
+	)
 
 	httpSrv := &http.Server{
 		Addr:              ":8080",
@@ -157,6 +160,15 @@ mux.Handle("/playground/", ipRateLimit.Middleware(playground.Handler("ChronoBunk
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    1 << 20,
 	}
+
+	go func() {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.Handler())
+		log.Println("metrics listening on :9090")
+		if err := http.ListenAndServe(":9090", metricsMux); err != nil {
+			log.Printf("metrics server: %v", err)
+		}
+	}()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

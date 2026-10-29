@@ -1,7 +1,4 @@
 // Package router implements the ChronoBunker model router.
-// It reads routing policy from YAML and model costs from Postgres,
-// tries the primary model first, and falls back through the chain
-// on failure. Every call is recorded in cost_events.
 package router
 
 import (
@@ -16,6 +13,7 @@ import (
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/breaker"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/telemetry"
 )
 
 // Provider is the interface that every LLM provider must implement.
@@ -82,8 +80,6 @@ func NewRouter(db *sql.DB, provider Provider, br *breaker.Breaker, policyPath st
 }
 
 // Route tries the primary model, then each fallback in order.
-// It returns the completion, the model ID that succeeded, the cost in USD,
-// and an error if every model in the chain failed.
 func (r *Router) Route(ctx context.Context, taskType, prompt, sessionID string) (*Completion, string, float64, error) {
 	route, ok := r.policy.Routes[taskType]
 	if !ok {
@@ -94,12 +90,10 @@ func (r *Router) Route(ctx context.Context, taskType, prompt, sessionID string) 
 
 	var lastErr error
 	for _, modelID := range chain {
-		// Check the breaker before attempting the model.
 		if r.breaker != nil {
 			allowed, err := r.breaker.Allow(ctx, breaker.TargetModel, modelID)
 			if err != nil {
 				log.Printf("router: breaker check failed for %q: %v", modelID, err)
-				// Fail open: if the breaker itself is broken, try the model anyway.
 			} else if !allowed {
 				log.Printf("router: breaker OPEN for %q, skipping", modelID)
 				lastErr = fmt.Errorf("model %q circuit-broken", modelID)
@@ -144,10 +138,13 @@ func (r *Router) Route(ctx context.Context, taskType, prompt, sessionID string) 
 			_ = r.breaker.RecordResult(ctx, breaker.TargetModel, modelID, true)
 		}
 
+		// Emit the cost metric. The tenant ID comes from the request context.
+		if tenantID, err := db.TenantIDFromContext(ctx); err == nil {
+			telemetry.RouterCostUSDTotal.WithLabelValues(tenantID, modelID).Add(cost)
+		}
+
 		if err := r.recordCost(ctx, sessionID, modelID, completion, cost, latency); err != nil {
 			log.Printf("router: failed to record cost event: %v", err)
-			// The completion succeeded; do not fail the request because
-			// the ledger write failed. Log and continue.
 		}
 
 		return completion, modelID, cost, nil

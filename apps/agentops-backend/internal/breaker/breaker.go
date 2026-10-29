@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/telemetry"
 )
 
 // State is the circuit breaker state.
@@ -60,11 +62,6 @@ func New(rdb *redis.Client, db *sql.DB, config Config) *Breaker {
 }
 
 // Allow returns true if the request should be attempted.
-//
-// CLOSED:   always true.
-// OPEN:     false, unless OpenTimeout has elapsed since the transition to OPEN
-//           (in which case the breaker transitions to HALF_OPEN and returns true).
-// HALF_OPEN: true (the caller must call RecordResult to report the outcome).
 func (b *Breaker) Allow(ctx context.Context, targetType TargetType, targetID string) (bool, error) {
 	state, err := b.loadState(ctx, targetType, targetID)
 	if err != nil {
@@ -78,11 +75,6 @@ func (b *Breaker) Allow(ctx context.Context, targetType TargetType, targetID str
 	case StateOpen:
 		openedAt, err := b.rdb.Get(ctx, stateKey(targetType, targetID, "opened_at")).Int64()
 		if errors.Is(err, redis.Nil) {
-			// Inconsistent state: the breaker is OPEN but opened_at is missing.
-			// Treat this as a hard failure: reject the request and log.
-			// Do NOT transition to HALF_OPEN, because we cannot tell whether
-			// the OpenTimeout has elapsed. The next successful transition
-			// will repair the state.
 			log.Printf("breaker: open state but opened_at missing for %s/%s; rejecting request", targetType, targetID)
 			return false, nil
 		}
@@ -129,7 +121,6 @@ func (b *Breaker) RecordResult(ctx context.Context, targetType TargetType, targe
 		return nil
 
 	case StateOpen:
-		// Allow already rejected; nothing to record.
 		return nil
 
 	case StateHalfOpen:
@@ -197,7 +188,7 @@ func (b *Breaker) transition(ctx context.Context, targetType TargetType, targetI
 		}
 	}
 
-	// Verify the state was actually written.
+	// Verification.
 	got, err := b.rdb.Get(ctx, stateKeyName).Result()
 	if err != nil {
 		log.Printf("breaker: verification failed to read state: %v", err)
@@ -216,7 +207,19 @@ func (b *Breaker) transition(ctx context.Context, targetType TargetType, targetI
 		}
 	}
 
-	// Publish for observers (dashboards, log aggregators).
+	// Emit the Prometheus gauge. 0=closed, 1=half_open, 2=open.
+	var stateValue float64
+	switch to {
+	case StateClosed:
+		stateValue = 0
+	case StateHalfOpen:
+		stateValue = 1
+	case StateOpen:
+		stateValue = 2
+	}
+	telemetry.BreakerState.WithLabelValues(string(targetType), targetID).Set(stateValue)
+
+	// Publish for observers.
 	payload := fmt.Sprintf("%s:%s:%s->%s:%s", targetType, targetID, from, to, reason)
 	b.rdb.Publish(ctx, "breaker:transitions", payload)
 
