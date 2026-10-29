@@ -106,17 +106,22 @@ func main() {
 	rateLimit := middleware.NewRateLimit(rdb, 100)
 
 	breakerInstance := breaker.New(rdb, database, breaker.DefaultConfig())
-	//modelRouter, err := router.NewRouter(database, &router.MockProvider{}, breakerInstance, policyPath)
+	
 	canary := os.Getenv("CHRONO_CANARY_TOKEN")
 if canary == "" {
 	canary = "CANARY-DEV-ONLY" // development fallback
 }
 sanitizer := security.NewOutputSanitizer(canary)
 
-modelRouter, err := router.NewRouter(database, &router.MockProvider{}, breakerInstance, sanitizer, policyPath)
-	if err != nil {
-		log.Fatalf("init router: %v", err)
-	}
+groqProvider, err := router.NewGroqProvider("openai/gpt-oss-120b")
+if err != nil {
+    log.Fatalf("init groq provider: %v", err)
+}
+
+modelRouter, err := router.NewRouter(database, groqProvider, breakerInstance, sanitizer, policyPath)
+if err != nil {
+	log.Fatalf("init router: %v", err)
+}
 
 	es := graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{

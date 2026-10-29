@@ -1,23 +1,18 @@
-# ChronoBunker Core - Model routing policy.
-# Each route maps a task type to a primary model and a fallback chain.
-# The router tries the primary first; if it fails or is circuit-broken,
-# it tries each fallback in order.
-
 version: 1
 
 routes:
   triage:
-    primary: groq/llama-3.1-8b
+    primary: groq/openai/gpt-oss-120b
     fallback:
-      - groq/llama-3.3-70b
+      - groq/openai/gpt-oss-20b
       - openai/gpt-4o-mini
     max_cost_per_call: 0.005
 
   reasoning:
-    primary: anthropic/claude-3.5-sonnet
+    primary: groq/openai/gpt-oss-120b
     fallback:
+      - anthropic/claude-3.5-sonnet
       - openai/gpt-4o
-      - xai/grok-2
     max_cost_per_call: 0.10
 
   vision:
