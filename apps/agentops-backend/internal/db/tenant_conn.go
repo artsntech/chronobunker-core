@@ -58,27 +58,29 @@ func WithTenantTx(ctx context.Context, db *sql.DB, fn func(tx *sql.Tx) error) er
 	if err != nil {
 		return fmt.Errorf("db: begin transaction: %w", err)
 	}
-	defer func() {
-		// Rollback is a no-op after a successful Commit, so it is safe
-		// to call unconditionally.
-		_ = tx.Rollback()
-	}()
+	defer func() { _ = tx.Rollback() }()
 
-	// Set the tenant context for this transaction only. Using a
-	// parameterised SET is not supported by PostgreSQL, so the value
-	// is interpolated. The tenant ID comes from an authenticated JWT
-	// and is validated as a UUID by the middleware, so interpolation
-	// here is safe.
+	// Set the tenant context for RLS.
 	if _, err := tx.ExecContext(ctx, fmt.Sprintf("SET LOCAL app.tenant_id = '%s'", tenantID)); err != nil {
 		return fmt.Errorf("db: set tenant context: %w", err)
+	}
+
+	// Per-transaction statement timeout. This bounds the wall-clock time of
+	// any single query inside the transaction. A query that exceeds this
+	// limit is aborted by Postgres, freeing the connection.
+	if _, err := tx.ExecContext(ctx, "SET LOCAL statement_timeout = '10s'"); err != nil {
+		return fmt.Errorf("db: set statement timeout: %w", err)
+	}
+
+	// Per-transaction lock timeout. A query that waits for a lock longer
+	// than this is aborted.
+	if _, err := tx.ExecContext(ctx, "SET LOCAL lock_timeout = '5s'"); err != nil {
+		return fmt.Errorf("db: set lock timeout: %w", err)
 	}
 
 	if err := fn(tx); err != nil {
 		return err
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("db: commit transaction: %w", err)
-	}
-	return nil
+	return tx.Commit()
 }
