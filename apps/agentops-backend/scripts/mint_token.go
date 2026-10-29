@@ -41,11 +41,12 @@ func main() {
 	}
 
 	claims := jwt.MapClaims{
-		"tenant_id": tenantID,
-		"iss":       "chronobunker",
-		"iat":       time.Now().Unix(),
-		"exp":       time.Now().Add(time.Hour).Unix(),
-	}
+	"tenant_id": tenantID,
+	"iss":       "chronobunker",
+	"aud":       "chronobunker-api",
+	"iat":       time.Now().Unix(),
+	"exp":       time.Now().Add(time.Hour).Unix(),
+}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	signed, err := token.SignedString(key)
 	if err != nil {

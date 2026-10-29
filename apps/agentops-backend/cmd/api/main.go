@@ -14,6 +14,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	_ "github.com/lib/pq"
 	"github.com/ravilushqa/otelgqlgen"
@@ -42,7 +43,6 @@ if pubKeyPath == "" {
 if abs, err := filepath.Abs(pubKeyPath); err == nil {
 	pubKeyPath = abs
 }
-log.Printf("JWT public key: %s", pubKeyPath)
 
 	// The routing policy path is configurable so that the binary can be run
 	// from any working directory. Defaults to policies/routing.yaml relative
@@ -103,21 +103,37 @@ log.Printf("JWT public key: %s", pubKeyPath)
 		log.Fatalf("init router: %v", err)
 	}
 
-	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
-		Resolvers: &graph.Resolver{
-			AgentRepo: agent.NewRepository(database),
-			Router:    modelRouter,
-			DB:        database,
-		},
-	}))
-	srv.Use(extension.FixedComplexityLimit(200))
-	srv.Use(otelgqlgen.Middleware())
+	// Build the GraphQL server manually so that introspection can be
+// conditionally enabled. NewDefaultServer always enables introspection.
+es := graph.NewExecutableSchema(graph.Config{
+	Resolvers: &graph.Resolver{
+		AgentRepo: agent.NewRepository(database),
+		Router:    modelRouter,
+		DB:        database,
+	},
+})
+
+srv := handler.New(es)
+srv.AddTransport(transport.Options{})
+srv.AddTransport(transport.POST{})
+srv.AddTransport(transport.GET{})
+
+// Introspection is only enabled in non-production environments.
+if os.Getenv("CHRONO_ENV") != "production" {
+	srv.Use(extension.Introspection{})
+}
+
+srv.Use(extension.FixedComplexityLimit(200))
+srv.Use(otelgqlgen.Middleware())
 
 	graphqlHandler := auth.Middleware(rateLimit.Middleware(srv))
 
 	ipRateLimit := middleware.NewIPRateLimit(rdb, 20, 10*time.Second) // 20 req per 10s per IP
 
 	mux := http.NewServeMux()
+	if os.Getenv("CHRONO_ENV") != "production" {
+    mux.Handle("/", ipRateLimit.Middleware(playground.Handler("ChronoBunker", "/query")))
+}
 	mux.Handle("/query", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		graphqlHandler.ServeHTTP(w, r)

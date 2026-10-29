@@ -76,6 +76,7 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 				}
 				return a.publicKey, nil
 			},
+			jwt.WithAudience("chronobunker-api"),
 			jwt.WithValidMethods([]string{"RS256"}),
 			jwt.WithIssuer("chronobunker"),
 			jwt.WithExpirationRequired(),

@@ -47,6 +47,7 @@ func issueToken(t *testing.T, key *rsa.PrivateKey, tenantID string, expiry time.
 		TenantID: tenantID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "chronobunker",
+			Audience:  jwt.ClaimStrings{"chronobunker-api"},
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
