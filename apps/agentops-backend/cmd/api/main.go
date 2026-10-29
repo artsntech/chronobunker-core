@@ -27,6 +27,7 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/router"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/middleware"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
 )
 
 func main() {
@@ -77,6 +78,8 @@ func main() {
 	database.SetConnMaxLifetime(5 * time.Minute)
 	database.SetConnMaxIdleTime(1 * time.Minute)
 
+	
+
 	var (
 		currentUser string
 		canBypass   bool
@@ -103,7 +106,14 @@ func main() {
 	rateLimit := middleware.NewRateLimit(rdb, 100)
 
 	breakerInstance := breaker.New(rdb, database, breaker.DefaultConfig())
-	modelRouter, err := router.NewRouter(database, &router.MockProvider{}, breakerInstance, policyPath)
+	//modelRouter, err := router.NewRouter(database, &router.MockProvider{}, breakerInstance, policyPath)
+	canary := os.Getenv("CHRONO_CANARY_TOKEN")
+if canary == "" {
+	canary = "CANARY-DEV-ONLY" // development fallback
+}
+sanitizer := security.NewOutputSanitizer(canary)
+
+modelRouter, err := router.NewRouter(database, &router.MockProvider{}, breakerInstance, sanitizer, policyPath)
 	if err != nil {
 		log.Fatalf("init router: %v", err)
 	}

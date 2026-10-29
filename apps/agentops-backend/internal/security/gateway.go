@@ -16,6 +16,7 @@ import (
 // ToolRequest is a request from an agent to invoke a tool.
 type ToolRequest struct {
 	SignedToken string
+	DeviceID    string  // NEW: must match the token's DeviceID claim
 	ToolName    string
 	Params      map[string]any
 }
@@ -67,6 +68,11 @@ func (g *Gateway) Invoke(ctx context.Context, req ToolRequest) (*ToolResponse, e
 	if tok.TenantID != ctxTenant {
 		g.audit.Reject(ctx, req, "tenant_mismatch")
 		return nil, errors.New("gateway: token tenant does not match request tenant")
+	}
+	// After verifying the token:
+	if tok.DeviceID != "" && req.DeviceID != tok.DeviceID {
+		g.audit.Reject(ctx, req, "device_mismatch")
+		return nil, errors.New("gateway: device ID does not match session")
 	}
 
 	// ── Step 2: Tool must be in the token's allowed list.

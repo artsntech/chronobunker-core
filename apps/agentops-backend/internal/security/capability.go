@@ -15,6 +15,7 @@ type CapabilityToken struct {
 	SessionID    string   `json:"sid"`
 	TenantID     string   `json:"tid"`
 	UserID       string   `json:"uid"`
+	DeviceID     string   `json:"did"`      // NEW: opaque device identifier
 	AllowedTools []string `json:"tools"`
 	ResourceIDs  []string `json:"resources"`
 	MaxAmount    float64  `json:"max_amt"`
@@ -55,12 +56,13 @@ func (ts *TokenService) PublicKey() ed25519.PublicKey {
 }
 
 // Issue creates a signed token with a 5-minute TTL.
-func (ts *TokenService) Issue(sessionID, tenantID, userID string, allowedTools, resourceIDs []string, maxAmount float64) (string, error) {
+func (ts *TokenService) Issue(sessionID, tenantID, userID, deviceID string, allowedTools, resourceIDs []string, maxAmount float64) (string, error) {
 	now := time.Now()
 	tok := CapabilityToken{
 		SessionID:    sessionID,
 		TenantID:     tenantID,
 		UserID:       userID,
+		DeviceID:     deviceID,
 		AllowedTools: allowedTools,
 		ResourceIDs:  resourceIDs,
 		MaxAmount:    maxAmount,

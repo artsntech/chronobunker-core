@@ -36,7 +36,7 @@ func TestGatewayRejectsCrossTenantResourceBinding(t *testing.T) {
 	tokens, _ := security.NewTokenService()
 
 	// Token grants access only to order ORD-1234, with a $50 max.
-	signed, err := tokens.Issue("sess-1", tenantAcme, "user-1",
+	signed, err := tokens.Issue("sess-1", tenantAcme, "user-1", "device-test-1",
 		[]string{"issue_refund"}, []string{"ORD-1234"}, 50.0)
 	if err != nil {
 		t.Fatalf("issue token: %v", err)
@@ -51,6 +51,7 @@ func TestGatewayRejectsCrossTenantResourceBinding(t *testing.T) {
 	ctx := db.WithTenantID(context.Background(), tenantAcme)
 	_, err = gw.Invoke(ctx, security.ToolRequest{
 		SignedToken: signed,
+		DeviceID:    "device-test-1",
 		ToolName:    "issue_refund",
 		Params:      map[string]any{"order_id": "ORD-9999", "amount": 10.0, "reason": "test"},
 	})
@@ -67,7 +68,8 @@ func TestGatewayIsIdempotentOnRetry(t *testing.T) {
 	tokens, _ := security.NewTokenService()
 
 	sessionID := fmt.Sprintf("sess-idem-%d", time.Now().UnixNano())
-	signed, _ := tokens.Issue(sessionID, tenantAcme, "user-1",
+	deviceID := "device-test-2"
+	signed, _ := tokens.Issue(sessionID, tenantAcme, "user-1", deviceID,
 		[]string{"issue_refund"}, []string{"ORD-1234"}, 50.0)
 
 	var calls int32
@@ -79,6 +81,7 @@ func TestGatewayIsIdempotentOnRetry(t *testing.T) {
 	ctx := db.WithTenantID(context.Background(), tenantAcme)
 	req := security.ToolRequest{
 		SignedToken: signed,
+		DeviceID:    deviceID,
 		ToolName:    "issue_refund",
 		Params:      map[string]any{"order_id": "ORD-1234", "amount": 10.0, "reason": "test"},
 	}
@@ -101,5 +104,33 @@ func TestGatewayIsIdempotentOnRetry(t *testing.T) {
 
 	if atomic.LoadInt32(&calls) != 1 {
 		t.Errorf("executor called %d times, expected exactly 1", calls)
+	}
+}
+
+func TestGatewayRejectsDeviceMismatch(t *testing.T) {
+	database := testDB(t)
+	tokens, _ := security.NewTokenService()
+
+	signed, _ := tokens.Issue("sess-dev", tenantAcme, "user-1", "device-A",
+		[]string{"issue_refund"}, []string{"ORD-1234"}, 50.0)
+
+	var executed int32
+	gw := security.NewGateway(database, tokens, func(ctx context.Context, name string, params map[string]any) (any, error) {
+		atomic.AddInt32(&executed, 1)
+		return "should not run", nil
+	})
+
+	ctx := db.WithTenantID(context.Background(), tenantAcme)
+	_, err := gw.Invoke(ctx, security.ToolRequest{
+		SignedToken: signed,
+		DeviceID:    "device-B", // wrong device
+		ToolName:    "issue_refund",
+		Params:      map[string]any{"order_id": "ORD-1234", "amount": 10.0, "reason": "test"},
+	})
+	if err == nil {
+		t.Fatal("expected device mismatch to be rejected")
+	}
+	if atomic.LoadInt32(&executed) != 0 {
+		t.Fatal("executor must not be called on device mismatch")
 	}
 }

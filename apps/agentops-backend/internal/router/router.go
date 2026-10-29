@@ -13,6 +13,7 @@ import (
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/breaker"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/telemetry"
 )
 
@@ -35,6 +36,7 @@ type Router struct {
 	policy   RoutingPolicy
 	cache    *modelCache
 	breaker  *breaker.Breaker
+	sanitizer *security.OutputSanitizer // NEW
 }
 
 // ModelSpec is the cost metadata for a single model.
@@ -60,7 +62,7 @@ type RouteConfig struct {
 }
 
 // NewRouter loads the policy from YAML and initializes the model cache.
-func NewRouter(db *sql.DB, provider Provider, br *breaker.Breaker, policyPath string) (*Router, error) {
+func NewRouter(db *sql.DB, provider Provider, br *breaker.Breaker, sanitizer *security.OutputSanitizer, policyPath string) (*Router, error) {
 	policyBytes, err := os.ReadFile(policyPath)
 	if err != nil {
 		return nil, fmt.Errorf("router: read policy: %w", err)
@@ -76,6 +78,7 @@ func NewRouter(db *sql.DB, provider Provider, br *breaker.Breaker, policyPath st
 		policy:   policy,
 		cache:    newModelCache(db),
 		breaker:  br,
+		sanitizer: sanitizer,
 	}, nil
 }
 
@@ -119,6 +122,17 @@ func (r *Router) Route(ctx context.Context, taskType, prompt, sessionID string) 
 				_ = r.breaker.RecordResult(ctx, breaker.TargetModel, modelID, false)
 			}
 			continue
+		}
+
+		// Sanitize the LLM output before returning it to the caller.
+		if r.sanitizer != nil {
+			cleanText, canaryLeak := r.sanitizer.Sanitize(completion.Text)
+			if canaryLeak {
+				log.Printf("SECURITY: canary leak detected from model %q; aborting", modelID)
+				lastErr = fmt.Errorf("canary leak detected")
+				continue // try fallback model
+			}
+			completion.Text = cleanText
 		}
 
 		cost := (float64(completion.InputTokens)*spec.InputCostPer1M +

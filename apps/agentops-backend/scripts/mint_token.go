@@ -18,15 +18,18 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 || len(os.Args) > 3 {
-		fmt.Fprintln(os.Stderr, "usage: go run scripts/mint_token.go <tenant_id> [private_key_path]")
+	if len(os.Args) < 2 || len(os.Args) > 4 {
+		fmt.Fprintln(os.Stderr, "usage: go run scripts/mint_token.go <tenant_id> [device_id] [private_key_path]")
 		os.Exit(1)
 	}
 	tenantID := os.Args[1]
-
+	deviceID := ""
+	if len(os.Args) >= 3 {
+		deviceID = os.Args[2]
+	}
 	keyPath := "../../secrets/jwt_private.pem"
-	if len(os.Args) == 3 {
-		keyPath = os.Args[2]
+	if len(os.Args) == 4 {
+		keyPath = os.Args[3]
 	}
 
 	keyBytes, err := os.ReadFile(keyPath)
@@ -42,6 +45,7 @@ func main() {
 
 	claims := jwt.MapClaims{
 	"tenant_id": tenantID,
+	"device_id": deviceID,
 	"iss":       "chronobunker",
 	"aud":       "chronobunker-api",
 	"iat":       time.Now().Unix(),
