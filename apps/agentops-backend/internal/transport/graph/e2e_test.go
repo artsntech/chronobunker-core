@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,19 +12,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/golang-jwt/jwt/v5"
 	_ "github.com/lib/pq"
-	"database/sql"
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/middleware"
-	"github.com/99designs/gqlgen/graphql/handler"
 )
 
 const (
 	tenantAcme   = "11111111-1111-1111-1111-111111111111"
 	tenantGlobex = "22222222-2222-2222-2222-222222222222"
+	agentAcmeID  = "5ca2ccb5-061f-4042-9222-9c076776a2e3"
 )
 
 func testDB(t *testing.T) *sql.DB {
@@ -40,7 +41,6 @@ func testDB(t *testing.T) *sql.DB {
 	return conn
 }
 
-// issueToken signs a JWT with the given private key and tenant ID.
 func issueToken(t *testing.T, key *rsa.PrivateKey, tenantID string, expiry time.Duration) string {
 	t.Helper()
 	claims := &middleware.Claims{
@@ -60,11 +60,17 @@ func issueToken(t *testing.T, key *rsa.PrivateKey, tenantID string, expiry time.
 	return signed
 }
 
-// graphqlRequest sends a POST to the GraphQL endpoint and returns the parsed body.
-func graphqlRequest(t *testing.T, srv http.Handler, token, query string) map[string]any {
+// graphqlRequest sends a POST to the GraphQL endpoint. The variables map may
+// be nil for queries without variables.
+func graphqlRequest(t *testing.T, srv http.Handler, token, query string, variables map[string]any) map[string]any {
 	t.Helper()
-	body, _ := json.Marshal(map[string]string{"query": query})
-	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(body))
+	body := map[string]any{"query": query}
+	if variables != nil {
+		body["variables"] = variables
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -82,28 +88,24 @@ func graphqlRequest(t *testing.T, srv http.Handler, token, query string) map[str
 
 func TestGraphQLTenantIsolationEndToEnd(t *testing.T) {
 	database := testDB(t)
-
-	// Generate an ephemeral RSA key pair for this test run.
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatalf("generate rsa key: %v", err)
 	}
 
-	// Build the same middleware chain used in production.
 	auth, err := middleware.NewAuthFromKey(&privateKey.PublicKey)
 	if err != nil {
 		t.Fatalf("init auth: %v", err)
 	}
 
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
-		Resolvers: &graph.Resolver{AgentRepo: agent.NewRepository(database)},
+		Resolvers: &graph.Resolver{AgentRepo: agent.NewRepository(database), DB: database},
 	}))
 
 	handler := auth.Middleware(srv)
 
-	// Query as Acme. Must see only Acme agents.
 	acmeToken := issueToken(t, privateKey, tenantAcme, time.Hour)
-	resp := graphqlRequest(t, handler, acmeToken, `{ agents { name tenantId } }`)
+	resp := graphqlRequest(t, handler, acmeToken, `{ agents { name tenantId } }`, nil)
 
 	data, ok := resp["data"].(map[string]any)
 	if !ok {
@@ -120,9 +122,8 @@ func TestGraphQLTenantIsolationEndToEnd(t *testing.T) {
 		}
 	}
 
-	// Query as Globex. Must see only Globex agents.
 	globexToken := issueToken(t, privateKey, tenantGlobex, time.Hour)
-	resp = graphqlRequest(t, handler, globexToken, `{ agents { name tenantId } }`)
+	resp = graphqlRequest(t, handler, globexToken, `{ agents { name tenantId } }`, nil)
 	data = resp["data"].(map[string]any)
 	agents = data["agents"].([]any)
 	for _, raw := range agents {
@@ -132,17 +133,15 @@ func TestGraphQLTenantIsolationEndToEnd(t *testing.T) {
 		}
 	}
 
-	// Expired token must return 401.
 	expiredToken := issueToken(t, privateKey, tenantAcme, -time.Hour)
-	resp = graphqlRequest(t, handler, expiredToken, `{ agents { name } }`)
+	resp = graphqlRequest(t, handler, expiredToken, `{ agents { name } }`, nil)
 	if _, hasData := resp["data"]; hasData {
 		t.Fatal("SECURITY: expired token was accepted")
 	}
 
-	// Token signed with a different key must return 401.
 	wrongKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	wrongToken := issueToken(t, wrongKey, tenantAcme, time.Hour)
-	resp = graphqlRequest(t, handler, wrongToken, `{ agents { name } }`)
+	resp = graphqlRequest(t, handler, wrongToken, `{ agents { name } }`, nil)
 	if _, hasData := resp["data"]; hasData {
 		t.Fatal("SECURITY: token signed with wrong key was accepted")
 	}

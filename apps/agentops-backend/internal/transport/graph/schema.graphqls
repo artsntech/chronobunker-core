@@ -1,4 +1,5 @@
 scalar Time
+scalar JSON
 
 enum AgentStatus {
   DRAFT
@@ -31,16 +32,6 @@ input UpdateAgentStatusInput {
   status: AgentStatus!
 }
 
-type Query {
-  agents: [Agent!]!
-  agent(id: ID!): Agent
-}
-
-type Mutation {
-  createAgent(input: CreateAgentInput!): Agent!
-  updateAgentStatus(input: UpdateAgentStatusInput!): Agent!
-}
-
 input InvokeAgentInput {
   agentId: ID!
   prompt: String!
@@ -54,6 +45,20 @@ type InvokeAgentResult {
   latencyMs: Int!
 }
 
+input InvokeToolInput {
+  agentId: ID!
+  sessionId: String!
+  deviceId: String!
+  toolName: String!
+  params: JSON!
+}
+
+type InvokeToolResult {
+  result: JSON!
+  cached: Boolean!
+  executed: Boolean!
+}
+
 type CostSummary {
   tenantId: ID!
   totalUsd: Float!
@@ -62,10 +67,15 @@ type CostSummary {
   to: Time!
 }
 
-extend type Mutation {
-  invokeAgent(input: InvokeAgentInput!): InvokeAgentResult!
+type Query {
+  agents: [Agent!]!
+  agent(id: ID!): Agent
+  costs(from: Time!, to: Time!): CostSummary!
 }
 
-extend type Query {
-  costs(from: Time!, to: Time!): CostSummary!
+type Mutation {
+  createAgent(input: CreateAgentInput!): Agent!
+  updateAgentStatus(input: UpdateAgentStatusInput!): Agent!
+  invokeAgent(input: InvokeAgentInput!): InvokeAgentResult!
+  invokeTool(input: InvokeToolInput!): InvokeToolResult!
 }

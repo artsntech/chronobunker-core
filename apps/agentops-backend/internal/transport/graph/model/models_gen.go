@@ -35,6 +35,20 @@ type InvokeAgentResult struct {
 	LatencyMs  int     `json:"latencyMs"`
 }
 
+type InvokeToolInput struct {
+	AgentID   string         `json:"agentId"`
+	SessionID string         `json:"sessionId"`
+	DeviceID  string         `json:"deviceId"`
+	ToolName  string         `json:"toolName"`
+	Params    map[string]any `json:"params"`
+}
+
+type InvokeToolResult struct {
+	Result   map[string]any `json:"result"`
+	Cached   bool           `json:"cached"`
+	Executed bool           `json:"executed"`
+}
+
 type Mutation struct {
 }
 

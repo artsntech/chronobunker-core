@@ -11,13 +11,19 @@ INSERT INTO tenants (id, name, slug) VALUES
 ON CONFLICT (slug) DO NOTHING;
 
 SET LOCAL app.tenant_id = '11111111-1111-1111-1111-111111111111';
-INSERT INTO agents (tenant_id, name, department, status) VALUES
-    ('11111111-1111-1111-1111-111111111111', 'Acme Triage Agent', 'support', 'production')
-ON CONFLICT (tenant_id, name) DO NOTHING;
+INSERT INTO agents (tenant_id, name, department, status, allowed_tools, target_model) VALUES
+    ('11111111-1111-1111-1111-111111111111', 'Acme Triage Agent', 'support', 'production',
+     ARRAY['search_help_center', 'get_order'], 'groq/openai/gpt-oss-120b')
+ON CONFLICT (tenant_id, name) DO UPDATE
+    SET allowed_tools = EXCLUDED.allowed_tools,
+        target_model = EXCLUDED.target_model;
 
 SET LOCAL app.tenant_id = '22222222-2222-2222-2222-222222222222';
-INSERT INTO agents (tenant_id, name, department, status) VALUES
-    ('22222222-2222-2222-2222-222222222222', 'Globex Triage Agent', 'support', 'production')
-ON CONFLICT (tenant_id, name) DO NOTHING;
+INSERT INTO agents (tenant_id, name, department, status, allowed_tools, target_model) VALUES
+    ('22222222-2222-2222-2222-222222222222', 'Globex Triage Agent', 'support', 'production',
+     ARRAY['search_help_center', 'get_order'], 'groq/openai/gpt-oss-120b')
+ON CONFLICT (tenant_id, name) DO UPDATE
+    SET allowed_tools = EXCLUDED.allowed_tools,
+        target_model = EXCLUDED.target_model;
 
 COMMIT;

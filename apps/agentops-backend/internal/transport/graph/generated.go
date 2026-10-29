@@ -30,7 +30,6 @@ func NewExecutableSchema(cfg Config) graphql.ExecutableSchema {
 type Config = graphql.Config[ResolverRoot, DirectiveRoot, ComplexityRoot]
 
 type ResolverRoot interface {
-	Agent() AgentResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 }
@@ -67,9 +66,16 @@ type ComplexityRoot struct {
 		ModelID    func(childComplexity int) int
 	}
 
+	InvokeToolResult struct {
+		Cached   func(childComplexity int) int
+		Executed func(childComplexity int) int
+		Result   func(childComplexity int) int
+	}
+
 	Mutation struct {
 		CreateAgent       func(childComplexity int, input model.CreateAgentInput) int
 		InvokeAgent       func(childComplexity int, input model.InvokeAgentInput) int
+		InvokeTool        func(childComplexity int, input model.InvokeToolInput) int
 		UpdateAgentStatus func(childComplexity int, input model.UpdateAgentStatusInput) int
 	}
 
@@ -84,14 +90,11 @@ type ComplexityRoot struct {
 
 // region    ************************** generated!.gotpl **************************
 
-type AgentResolver interface {
-	AllowedTools(ctx context.Context, obj *agent.Agent) ([]string, error)
-	TargetModel(ctx context.Context, obj *agent.Agent) (string, error)
-}
 type MutationResolver interface {
 	CreateAgent(ctx context.Context, input model.CreateAgentInput) (*agent.Agent, error)
 	UpdateAgentStatus(ctx context.Context, input model.UpdateAgentStatusInput) (*agent.Agent, error)
 	InvokeAgent(ctx context.Context, input model.InvokeAgentInput) (*model.InvokeAgentResult, error)
+	InvokeTool(ctx context.Context, input model.InvokeToolInput) (*model.InvokeToolResult, error)
 }
 type QueryResolver interface {
 	Agents(ctx context.Context) ([]*agent.Agent, error)
@@ -234,6 +237,25 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.InvokeAgentResult.ModelID(childComplexity), true
 
+	case "InvokeToolResult.cached":
+		if e.ComplexityRoot.InvokeToolResult.Cached == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InvokeToolResult.Cached(childComplexity), true
+	case "InvokeToolResult.executed":
+		if e.ComplexityRoot.InvokeToolResult.Executed == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InvokeToolResult.Executed(childComplexity), true
+	case "InvokeToolResult.result":
+		if e.ComplexityRoot.InvokeToolResult.Result == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InvokeToolResult.Result(childComplexity), true
+
 	case "Mutation.createAgent":
 		if e.ComplexityRoot.Mutation.CreateAgent == nil {
 			break
@@ -256,6 +278,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.InvokeAgent(childComplexity, args["input"].(model.InvokeAgentInput)), true
+	case "Mutation.invokeTool":
+		if e.ComplexityRoot.Mutation.InvokeTool == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_invokeTool_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.InvokeTool(childComplexity, args["input"].(model.InvokeToolInput)), true
 	case "Mutation.updateAgentStatus":
 		if e.ComplexityRoot.Mutation.UpdateAgentStatus == nil {
 			break
@@ -308,6 +341,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		return graphql.NewInputUnmarshalerIndex(
 			graphql.NewInputUnmarshaler("CreateAgentInput", ec.unmarshalInputCreateAgentInput),
 			graphql.NewInputUnmarshaler("InvokeAgentInput", ec.unmarshalInputInvokeAgentInput),
+			graphql.NewInputUnmarshaler("InvokeToolInput", ec.unmarshalInputInvokeToolInput),
 			graphql.NewInputUnmarshaler("UpdateAgentStatusInput", ec.unmarshalInputUpdateAgentStatusInput),
 		)
 	}
@@ -460,6 +494,18 @@ func (ec *executionContext) childFields_InvokeAgentResult(ctx context.Context, f
 	return nil, fmt.Errorf("no field named %q was found under type InvokeAgentResult", field.Name)
 }
 
+func (ec *executionContext) childFields_InvokeToolResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "result":
+		return ec.fieldContext_InvokeToolResult_result(ctx, field)
+	case "cached":
+		return ec.fieldContext_InvokeToolResult_cached(ctx, field)
+	case "executed":
+		return ec.fieldContext_InvokeToolResult_executed(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type InvokeToolResult", field.Name)
+}
+
 func (ec *executionContext) childFields___Directive(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "name":
@@ -596,6 +642,20 @@ func (ec *executionContext) field_Mutation_invokeAgent_args(ctx context.Context,
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.InvokeAgentInput, error) {
 			return ec.unmarshalNInvokeAgentInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐInvokeAgentInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_invokeTool_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.InvokeToolInput, error) {
+			return ec.unmarshalNInvokeToolInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐInvokeToolInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -889,7 +949,7 @@ func (ec *executionContext) _Agent_allowedTools(ctx context.Context, field graph
 			return ec.fieldContext_Agent_allowedTools(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Agent().AllowedTools(ctx, obj)
+			return obj.AllowedTools, nil
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
@@ -900,7 +960,7 @@ func (ec *executionContext) _Agent_allowedTools(ctx context.Context, field graph
 	)
 }
 func (ec *executionContext) fieldContext_Agent_allowedTools(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("Agent", field, true, true, "String")
+	return graphql.NewScalarFieldContext("Agent", field, false, false, "String")
 }
 
 func (ec *executionContext) _Agent_targetModel(ctx context.Context, field graphql.CollectedField, obj *agent.Agent) (ret graphql.Marshaler) {
@@ -912,7 +972,7 @@ func (ec *executionContext) _Agent_targetModel(ctx context.Context, field graphq
 			return ec.fieldContext_Agent_targetModel(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Agent().TargetModel(ctx, obj)
+			return obj.TargetModel, nil
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
@@ -923,7 +983,7 @@ func (ec *executionContext) _Agent_targetModel(ctx context.Context, field graphq
 	)
 }
 func (ec *executionContext) fieldContext_Agent_targetModel(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("Agent", field, true, true, "String")
+	return graphql.NewScalarFieldContext("Agent", field, false, false, "String")
 }
 
 func (ec *executionContext) _Agent_createdAt(ctx context.Context, field graphql.CollectedField, obj *agent.Agent) (ret graphql.Marshaler) {
@@ -1179,6 +1239,75 @@ func (ec *executionContext) fieldContext_InvokeAgentResult_latencyMs(_ context.C
 	return graphql.NewScalarFieldContext("InvokeAgentResult", field, false, false, "Int")
 }
 
+func (ec *executionContext) _InvokeToolResult_result(ctx context.Context, field graphql.CollectedField, obj *model.InvokeToolResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InvokeToolResult_result(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Result, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v map[string]any) graphql.Marshaler {
+			return ec.marshalNJSON2map(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InvokeToolResult_result(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InvokeToolResult", field, false, false, "JSON")
+}
+
+func (ec *executionContext) _InvokeToolResult_cached(ctx context.Context, field graphql.CollectedField, obj *model.InvokeToolResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InvokeToolResult_cached(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Cached, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InvokeToolResult_cached(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InvokeToolResult", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _InvokeToolResult_executed(ctx context.Context, field graphql.CollectedField, obj *model.InvokeToolResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InvokeToolResult_executed(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Executed, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InvokeToolResult_executed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InvokeToolResult", field, false, false, "Boolean")
+}
+
 func (ec *executionContext) _Mutation_createAgent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1305,6 +1434,50 @@ func (ec *executionContext) fieldContext_Mutation_invokeAgent(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_invokeAgent_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_invokeTool(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_invokeTool(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().InvokeTool(ctx, fc.Args["input"].(model.InvokeToolInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.InvokeToolResult) graphql.Marshaler {
+			return ec.marshalNInvokeToolResult2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐInvokeToolResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_invokeTool(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_InvokeToolResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_invokeTool_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -2692,6 +2865,76 @@ func UnmarshalInvokeAgentInput(ctx context.Context, raw any) (model.InvokeAgentI
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputInvokeToolInput(ctx context.Context, obj any) (model.InvokeToolInput, error) {
+	var it model.InvokeToolInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"agentId", "sessionId", "deviceId", "toolName", "params"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "agentId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("agentId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AgentID = data
+		case "sessionId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sessionId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SessionID = data
+		case "deviceId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("deviceId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DeviceID = data
+		case "toolName":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("toolName"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ToolName = data
+		case "params":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("params"))
+			data, err := ec.unmarshalNJSON2map(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Params = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalInvokeToolInput unmarshals raw into the InvokeToolInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalInvokeToolInput(ctx context.Context, raw any) (model.InvokeToolInput, error) {
+	var out model.InvokeToolInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "InvokeToolInput", raw, &out)
+	return out, err
+}
+
 func (ec *executionContext) unmarshalInputUpdateAgentStatusInput(ctx context.Context, obj any) (model.UpdateAgentStatusInput, error) {
 	var it model.UpdateAgentStatusInput
 	if obj == nil {
@@ -2763,54 +3006,52 @@ func (ec *executionContext) _Agent(ctx context.Context, sel ast.SelectionSet, ob
 		case "id":
 			out.Values[i] = ec._Agent_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "tenantId":
 			out.Values[i] = ec._Agent_tenantId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "name":
 			out.Values[i] = ec._Agent_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "department":
 			out.Values[i] = ec._Agent_department(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "status":
 			out.Values[i] = ec._Agent_status(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "healthScore":
 			out.Values[i] = ec._Agent_healthScore(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "allowedTools":
-			out.ResolveConcurrently(ec.OperationContext, &deferred, i,
-				true, true,
-				func(ctx context.Context) graphql.Marshaler {
-					return ec._Agent_allowedTools(ctx, field, obj)
-				})
+			out.Values[i] = ec._Agent_allowedTools(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "targetModel":
-			out.ResolveConcurrently(ec.OperationContext, &deferred, i,
-				true, true,
-				func(ctx context.Context) graphql.Marshaler {
-					return ec._Agent_targetModel(ctx, field, obj)
-				})
+			out.Values[i] = ec._Agent_targetModel(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createdAt":
 			out.Values[i] = ec._Agent_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Agent_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -2930,6 +3171,49 @@ func (ec *executionContext) _InvokeAgentResult(ctx context.Context, sel ast.Sele
 	return out
 }
 
+var invokeToolResultImplementors = []string{"InvokeToolResult"}
+
+func (ec *executionContext) _InvokeToolResult(ctx context.Context, sel ast.SelectionSet, obj *model.InvokeToolResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, invokeToolResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InvokeToolResult")
+		case "result":
+			out.Values[i] = ec._InvokeToolResult_result(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cached":
+			out.Values[i] = ec._InvokeToolResult_cached(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "executed":
+			out.Values[i] = ec._InvokeToolResult_executed(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -2966,6 +3250,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "invokeAgent":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_invokeAgent(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "invokeTool":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_invokeTool(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -3536,6 +3827,37 @@ func (ec *executionContext) marshalNInvokeAgentResult2ᚖgithubᚗcomᚋartsntec
 		return graphql.Null
 	}
 	return ec._InvokeAgentResult(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNInvokeToolInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐInvokeToolInput(ctx context.Context, v any) (model.InvokeToolInput, error) {
+	res, err := ec.unmarshalInputInvokeToolInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInvokeToolResult2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐInvokeToolResult(ctx context.Context, sel ast.SelectionSet, v *model.InvokeToolResult) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "InvokeToolResult!")
+		return graphql.Null
+	}
+	return ec._InvokeToolResult(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNJSON2map(ctx context.Context, v any) (map[string]any, error) {
+	res, err := graphql.UnmarshalMap(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNJSON2map(ctx context.Context, sel ast.SelectionSet, v map[string]any) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "JSON!")
+		return graphql.Null
+	}
+	_ = sel
+	res := graphql.MarshalMap(v)
+	if res == graphql.Null {
+		graphql.AddInvalidNullFromMarshaler(ctx, "JSON!")
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {

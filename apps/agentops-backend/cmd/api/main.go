@@ -25,13 +25,12 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/breaker"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/router"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/middleware"
-	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
 )
 
 func main() {
-	// Structured logging: JSON in production, text in development.
 	var logHandler slog.Handler
 	if os.Getenv("CHRONO_ENV") == "production" {
 		logHandler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
@@ -78,8 +77,6 @@ func main() {
 	database.SetConnMaxLifetime(5 * time.Minute)
 	database.SetConnMaxIdleTime(1 * time.Minute)
 
-	
-
 	var (
 		currentUser string
 		canBypass   bool
@@ -106,28 +103,47 @@ func main() {
 	rateLimit := middleware.NewRateLimit(rdb, 100)
 
 	breakerInstance := breaker.New(rdb, database, breaker.DefaultConfig())
-	
+
+	groqProvider, err := router.NewGroqProvider("openai/gpt-oss-120b")
+	if err != nil {
+		log.Fatalf("init groq provider: %v", err)
+	}
+
 	canary := os.Getenv("CHRONO_CANARY_TOKEN")
-if canary == "" {
-	canary = "CANARY-DEV-ONLY" // development fallback
-}
-sanitizer := security.NewOutputSanitizer(canary)
+	if canary == "" {
+		canary = "CANARY-DEV-ONLY"
+	}
+	sanitizer := security.NewOutputSanitizer(canary)
 
-groqProvider, err := router.NewGroqProvider("openai/gpt-oss-120b")
-if err != nil {
-    log.Fatalf("init groq provider: %v", err)
-}
+	modelRouter, err := router.NewRouter(database, groqProvider, breakerInstance, sanitizer, policyPath)
+	if err != nil {
+		log.Fatalf("init router: %v", err)
+	}
 
-modelRouter, err := router.NewRouter(database, groqProvider, breakerInstance, sanitizer, policyPath)
-if err != nil {
-	log.Fatalf("init router: %v", err)
-}
+	// Capability token service and tool gateway.
+	tokenService, err := security.NewTokenService()
+	if err != nil {
+		log.Fatalf("init token service: %v", err)
+	}
+
+	gateway := security.NewGateway(database, tokenService, func(ctx context.Context, toolName string, params map[string]any) (any, error) {
+		// In production, this dispatches to the real tool implementations
+		// (Stripe for refunds, SendGrid for emails, etc.). For now, it
+		// returns a synthetic result so the end-to-end flow is exercised.
+		return map[string]any{
+			"tool":   toolName,
+			"params": params,
+			"status": "executed",
+		}, nil
+	})
 
 	es := graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{
-			AgentRepo: agent.NewRepository(database),
-			Router:    modelRouter,
-			DB:        database,
+			AgentRepo:    agent.NewRepository(database),
+			Router:       modelRouter,
+			DB:           database,
+			TokenService: tokenService,
+			Gateway:      gateway,
 		},
 	})
 

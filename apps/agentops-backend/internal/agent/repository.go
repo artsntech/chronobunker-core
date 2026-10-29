@@ -1,4 +1,3 @@
-// Package agent contains the domain model and repository for AI agents.
 package agent
 
 import (
@@ -8,10 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lib/pq"
+
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
 )
 
-// Status is the lifecycle state of an agent.
 type Status string
 
 const (
@@ -21,40 +21,35 @@ const (
 	StatusKilled     Status = "killed"
 )
 
-// Agent is the domain representation of an AI agent.
 type Agent struct {
-	ID          string
-	TenantID    string
-	Name        string
-	Department  string
-	Status      Status
-	HealthScore float64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID           string
+	TenantID     string
+	Name         string
+	Department   string
+	Status       Status
+	HealthScore  float64
+	AllowedTools []string
+	TargetModel  string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
-// ErrNotFound is returned when an agent does not exist or is not visible
-// to the current tenant. The two cases are intentionally indistinguishable
-// to prevent cross-tenant information leakage.
 var ErrNotFound = errors.New("agent: not found")
 
-// Repository provides CRUD operations for agents. All methods require
-// a context carrying a tenant ID and must be called inside db.WithTenantTx.
 type Repository struct {
 	db *sql.DB
 }
 
-// NewRepository constructs a Repository.
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
-// List returns all agents visible to the current tenant.
 func (r *Repository) List(ctx context.Context) ([]*Agent, error) {
 	var agents []*Agent
 	err := db.WithTenantTx(ctx, r.db, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
-			SELECT id, tenant_id, name, department, status, health_score, created_at, updated_at
+			SELECT id, tenant_id, name, department, status, health_score,
+			       allowed_tools, target_model, created_at, updated_at
 			FROM agents
 			ORDER BY created_at DESC`)
 		if err != nil {
@@ -66,7 +61,9 @@ func (r *Repository) List(ctx context.Context) ([]*Agent, error) {
 			a := &Agent{}
 			if err := rows.Scan(
 				&a.ID, &a.TenantID, &a.Name, &a.Department,
-				&a.Status, &a.HealthScore, &a.CreatedAt, &a.UpdatedAt,
+				&a.Status, &a.HealthScore,
+				pq.Array(&a.AllowedTools), &a.TargetModel,
+				&a.CreatedAt, &a.UpdatedAt,
 			); err != nil {
 				return fmt.Errorf("scan agent: %w", err)
 			}
@@ -77,20 +74,21 @@ func (r *Repository) List(ctx context.Context) ([]*Agent, error) {
 	return agents, err
 }
 
-// GetByID returns the agent with the given ID, or ErrNotFound if it does
-// not exist or belongs to a different tenant.
 func (r *Repository) GetByID(ctx context.Context, id string) (*Agent, error) {
 	var a *Agent
 	err := db.WithTenantTx(ctx, r.db, func(tx *sql.Tx) error {
 		row := tx.QueryRowContext(ctx, `
-			SELECT id, tenant_id, name, department, status, health_score, created_at, updated_at
+			SELECT id, tenant_id, name, department, status, health_score,
+			       allowed_tools, target_model, created_at, updated_at
 			FROM agents
 			WHERE id = $1`, id)
 
 		a = &Agent{}
 		err := row.Scan(
 			&a.ID, &a.TenantID, &a.Name, &a.Department,
-			&a.Status, &a.HealthScore, &a.CreatedAt, &a.UpdatedAt,
+			&a.Status, &a.HealthScore,
+			pq.Array(&a.AllowedTools), &a.TargetModel,
+			&a.CreatedAt, &a.UpdatedAt,
 		)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
@@ -103,7 +101,6 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*Agent, error) {
 	return a, nil
 }
 
-// Create inserts a new agent for the current tenant.
 func (r *Repository) Create(ctx context.Context, name, department string) (*Agent, error) {
 	tenantID, err := db.TenantIDFromContext(ctx)
 	if err != nil {
@@ -115,13 +112,16 @@ func (r *Repository) Create(ctx context.Context, name, department string) (*Agen
 		row := tx.QueryRowContext(ctx, `
 			INSERT INTO agents (tenant_id, name, department, status)
 			VALUES ($1, $2, $3, 'draft')
-			RETURNING id, tenant_id, name, department, status, health_score, created_at, updated_at`,
+			RETURNING id, tenant_id, name, department, status, health_score,
+			          allowed_tools, target_model, created_at, updated_at`,
 			tenantID, name, department)
 
 		a = &Agent{}
 		return row.Scan(
 			&a.ID, &a.TenantID, &a.Name, &a.Department,
-			&a.Status, &a.HealthScore, &a.CreatedAt, &a.UpdatedAt,
+			&a.Status, &a.HealthScore,
+			pq.Array(&a.AllowedTools), &a.TargetModel,
+			&a.CreatedAt, &a.UpdatedAt,
 		)
 	})
 	if err != nil {
@@ -130,8 +130,6 @@ func (r *Repository) Create(ctx context.Context, name, department string) (*Agen
 	return a, nil
 }
 
-// UpdateStatus changes the status of an agent. Only the current tenant
-// can update its own agents, enforced by RLS.
 func (r *Repository) UpdateStatus(ctx context.Context, id string, status Status) error {
 	return db.WithTenantTx(ctx, r.db, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `
