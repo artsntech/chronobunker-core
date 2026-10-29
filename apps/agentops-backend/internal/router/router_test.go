@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"testing"
-	"runtime"
-	"path/filepath"
-	"fmt"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -18,7 +18,6 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/router"
 )
 
-// mockProvider fails for the first N calls, then succeeds.
 type mockProvider struct {
 	failures int32
 	calls    int32
@@ -46,25 +45,37 @@ func testDB(t *testing.T) *sql.DB {
 	return conn
 }
 
+func policyPath(t *testing.T) string {
+	t.Helper()
+	if p := os.Getenv("CHRONO_ROUTING_POLICY_PATH"); p != "" {
+		return p
+	}
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot determine test file location")
+	}
+	root := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "..")
+	return filepath.Join(root, "policies", "routing.yaml")
+}
+
 const tenantAcme = "11111111-1111-1111-1111-111111111111"
 
 func TestRouterFallsBackOnProviderFailure(t *testing.T) {
 	database := testDB(t)
-	provider := &mockProvider{failures: 1} // fail first call, succeed second
-	r, err := router.NewRouter(database, provider, policyPath(t))
+	provider := &mockProvider{failures: 1}
+	r, err := router.NewRouter(database, provider, nil, policyPath(t))
 	if err != nil {
 		t.Fatalf("new router: %v", err)
 	}
 
 	ctx := db.WithTenantID(context.Background(), tenantAcme)
-	completion, modelID, err := r.Route(ctx, "triage", "hello", "sess-test")
+	completion, modelID, _, err := r.Route(ctx, "triage", "hello", "sess-test")
 	if err != nil {
 		t.Fatalf("route: %v", err)
 	}
 	if completion.Text != "ok" {
 		t.Errorf("expected ok, got %q", completion.Text)
 	}
-	// The first call failed, so the router must have used the fallback.
 	if modelID == "groq/llama-3.1-8b" {
 		t.Errorf("expected fallback model, got primary %q", modelID)
 	}
@@ -73,15 +84,14 @@ func TestRouterFallsBackOnProviderFailure(t *testing.T) {
 func TestRouterRecordsCostEvent(t *testing.T) {
 	database := testDB(t)
 	provider := &mockProvider{failures: 0}
-	r, err := router.NewRouter(database, provider, policyPath(t))
+	r, err := router.NewRouter(database, provider, nil, policyPath(t))
 	if err != nil {
 		t.Fatalf("new router: %v", err)
 	}
 
 	sessionID := fmt.Sprintf("sess-cost-%d", time.Now().UnixNano())
-
 	ctx := db.WithTenantID(context.Background(), tenantAcme)
-	_, _, err = r.Route(ctx, "triage", "hello", sessionID)
+	_, _, _, err = r.Route(ctx, "triage", "hello", sessionID)
 	if err != nil {
 		t.Fatalf("route: %v", err)
 	}
@@ -96,19 +106,4 @@ func TestRouterRecordsCostEvent(t *testing.T) {
 	if count != 1 {
 		t.Errorf("expected 1 cost event, got %d", count)
 	}
-}
-
-func policyPath(t *testing.T) string {
-	t.Helper()
-	if p := os.Getenv("CHRONO_ROUTING_POLICY_PATH"); p != "" {
-		return p
-	}
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("cannot determine test file location")
-	}
-	// thisFile is .../apps/agentops-backend/internal/router/router_test.go
-	// Walk up to the project root, then into policies/.
-	root := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "..")
-	return filepath.Join(root, "policies", "routing.yaml")
 }

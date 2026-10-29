@@ -14,11 +14,11 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/breaker"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
 )
 
 // Provider is the interface that every LLM provider must implement.
-// It is injected into the Router so that tests can substitute mocks.
 type Provider interface {
 	Complete(ctx context.Context, modelID string, prompt string) (*Completion, error)
 }
@@ -35,7 +35,8 @@ type Router struct {
 	db       *sql.DB
 	provider Provider
 	policy   RoutingPolicy
-	models   map[string]ModelSpec // in-memory cache, refreshed on startup
+	cache    *modelCache
+	breaker  *breaker.Breaker
 }
 
 // ModelSpec is the cost metadata for a single model.
@@ -60,9 +61,8 @@ type RouteConfig struct {
 	MaxCostPerCall float64  `yaml:"max_cost_per_call"`
 }
 
-// NewRouter loads the policy from YAML and the model registry from Postgres.
-// It fails fast if either is missing or malformed.
-func NewRouter(db *sql.DB, provider Provider, policyPath string) (*Router, error) {
+// NewRouter loads the policy from YAML and initializes the model cache.
+func NewRouter(db *sql.DB, provider Provider, br *breaker.Breaker, policyPath string) (*Router, error) {
 	policyBytes, err := os.ReadFile(policyPath)
 	if err != nil {
 		return nil, fmt.Errorf("router: read policy: %w", err)
@@ -72,35 +72,45 @@ func NewRouter(db *sql.DB, provider Provider, policyPath string) (*Router, error
 		return nil, fmt.Errorf("router: parse policy: %w", err)
 	}
 
-	models, err := loadModels(db)
-	if err != nil {
-		return nil, fmt.Errorf("router: load models: %w", err)
-	}
-
 	return &Router{
 		db:       db,
 		provider: provider,
 		policy:   policy,
-		models:   models,
+		cache:    newModelCache(db),
+		breaker:  br,
 	}, nil
 }
 
 // Route tries the primary model, then each fallback in order.
-// It records the successful call in cost_events and returns the completion.
-// If every model in the chain fails, it returns an error.
-func (r *Router) Route(ctx context.Context, taskType, prompt, sessionID string) (*Completion, string, error) {
+// It returns the completion, the model ID that succeeded, the cost in USD,
+// and an error if every model in the chain failed.
+func (r *Router) Route(ctx context.Context, taskType, prompt, sessionID string) (*Completion, string, float64, error) {
 	route, ok := r.policy.Routes[taskType]
 	if !ok {
-		return nil, "", fmt.Errorf("router: no route for task type %q", taskType)
+		return nil, "", 0, fmt.Errorf("router: no route for task type %q", taskType)
 	}
 
 	chain := append([]string{route.Primary}, route.Fallback...)
 
 	var lastErr error
 	for _, modelID := range chain {
-		spec, ok := r.models[modelID]
-		if !ok {
-			log.Printf("router: model %q not in registry, skipping", modelID)
+		// Check the breaker before attempting the model.
+		if r.breaker != nil {
+			allowed, err := r.breaker.Allow(ctx, breaker.TargetModel, modelID)
+			if err != nil {
+				log.Printf("router: breaker check failed for %q: %v", modelID, err)
+				// Fail open: if the breaker itself is broken, try the model anyway.
+			} else if !allowed {
+				log.Printf("router: breaker OPEN for %q, skipping", modelID)
+				lastErr = fmt.Errorf("model %q circuit-broken", modelID)
+				continue
+			}
+		}
+
+		spec, err := r.cache.Get(ctx, modelID)
+		if err != nil {
+			log.Printf("router: model %q not in registry: %v", modelID, err)
+			lastErr = err
 			continue
 		}
 
@@ -111,6 +121,9 @@ func (r *Router) Route(ctx context.Context, taskType, prompt, sessionID string) 
 		if err != nil {
 			log.Printf("router: model %q failed: %v", modelID, err)
 			lastErr = err
+			if r.breaker != nil {
+				_ = r.breaker.RecordResult(ctx, breaker.TargetModel, modelID, false)
+			}
 			continue
 		}
 
@@ -121,7 +134,14 @@ func (r *Router) Route(ctx context.Context, taskType, prompt, sessionID string) 
 			log.Printf("router: model %q exceeded max cost per call ($%.6f > $%.6f), trying fallback",
 				modelID, cost, route.MaxCostPerCall)
 			lastErr = fmt.Errorf("cost %.6f exceeds limit %.6f", cost, route.MaxCostPerCall)
+			if r.breaker != nil {
+				_ = r.breaker.RecordResult(ctx, breaker.TargetModel, modelID, true)
+			}
 			continue
+		}
+
+		if r.breaker != nil {
+			_ = r.breaker.RecordResult(ctx, breaker.TargetModel, modelID, true)
 		}
 
 		if err := r.recordCost(ctx, sessionID, modelID, completion, cost, latency); err != nil {
@@ -130,36 +150,22 @@ func (r *Router) Route(ctx context.Context, taskType, prompt, sessionID string) 
 			// the ledger write failed. Log and continue.
 		}
 
-		return completion, modelID, nil
+		return completion, modelID, cost, nil
 	}
 
-	return nil, "", fmt.Errorf("router: all models failed for task %q: %w", taskType, lastErr)
+	return nil, "", 0, fmt.Errorf("router: all models failed for task %q: %w", taskType, lastErr)
 }
 
 func (r *Router) recordCost(ctx context.Context, sessionID, modelID string, c *Completion, cost float64, latency time.Duration) error {
+	tenantID, err := db.TenantIDFromContext(ctx)
+	if err != nil {
+		return err
+	}
 	return db.WithTenantTx(ctx, r.db, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `
 			INSERT INTO cost_events (tenant_id, session_id, model_id, input_tokens, output_tokens, cost_usd, latency_ms)
-			VALUES (current_setting('app.tenant_id')::UUID, $1, $2, $3, $4, $5, $6)`,
-			sessionID, modelID, c.InputTokens, c.OutputTokens, cost, latency.Milliseconds())
+			VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			tenantID, sessionID, modelID, c.InputTokens, c.OutputTokens, cost, latency.Milliseconds())
 		return err
 	})
-}
-
-func loadModels(db *sql.DB) (map[string]ModelSpec, error) {
-	rows, err := db.Query(`SELECT id, provider, input_cost_per_1m, output_cost_per_1m, context_window FROM models WHERE status = 'ga'`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	models := make(map[string]ModelSpec)
-	for rows.Next() {
-		var m ModelSpec
-		if err := rows.Scan(&m.ID, &m.Provider, &m.InputCostPer1M, &m.OutputCostPer1M, &m.ContextWindow); err != nil {
-			return nil, err
-		}
-		models[m.ID] = m
-	}
-	return models, rows.Err()
 }

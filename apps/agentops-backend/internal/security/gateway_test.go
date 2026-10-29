@@ -6,6 +6,8 @@ import (
 	"os"
 	"sync/atomic"
 	"testing"
+	"fmt"
+	"time"
 
 	_ "github.com/lib/pq"
 
@@ -63,7 +65,9 @@ func TestGatewayRejectsCrossTenantResourceBinding(t *testing.T) {
 func TestGatewayIsIdempotentOnRetry(t *testing.T) {
 	database := testDB(t)
 	tokens, _ := security.NewTokenService()
-	signed, _ := tokens.Issue("sess-2", tenantAcme, "user-1",
+
+	sessionID := fmt.Sprintf("sess-idem-%d", time.Now().UnixNano())
+	signed, _ := tokens.Issue(sessionID, tenantAcme, "user-1",
 		[]string{"issue_refund"}, []string{"ORD-1234"}, 50.0)
 
 	var calls int32
@@ -79,23 +83,20 @@ func TestGatewayIsIdempotentOnRetry(t *testing.T) {
 		Params:      map[string]any{"order_id": "ORD-1234", "amount": 10.0, "reason": "test"},
 	}
 
-	// First call: executes the side effect.
 	resp1, err := gw.Invoke(ctx, req)
 	if err != nil {
 		t.Fatalf("first invoke: %v", err)
 	}
 	if !resp1.Executed {
-		t.Error("first invoke should have executed")
+		t.Errorf("first invoke should have executed, got Executed=%v Cached=%v", resp1.Executed, resp1.Cached)
 	}
 
-	// Retry with the exact same params: must return the cached result,
-	// not execute the side effect again.
 	resp2, err := gw.Invoke(ctx, req)
 	if err != nil {
 		t.Fatalf("second invoke: %v", err)
 	}
 	if !resp2.Cached {
-		t.Error("second invoke should have returned cached result")
+		t.Errorf("second invoke should have returned cached result, got Executed=%v Cached=%v", resp2.Executed, resp2.Cached)
 	}
 
 	if atomic.LoadInt32(&calls) != 1 {

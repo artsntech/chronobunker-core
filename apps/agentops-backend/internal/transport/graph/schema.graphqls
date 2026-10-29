@@ -40,3 +40,32 @@ type Mutation {
   createAgent(input: CreateAgentInput!): Agent!
   updateAgentStatus(input: UpdateAgentStatusInput!): Agent!
 }
+
+input InvokeAgentInput {
+  agentId: ID!
+  prompt: String!
+  sessionId: String!
+}
+
+type InvokeAgentResult {
+  completion: String!
+  modelId: String!
+  costUsd: Float!
+  latencyMs: Int!
+}
+
+type CostSummary {
+  tenantId: ID!
+  totalUsd: Float!
+  eventCount: Int!
+  from: Time!
+  to: Time!
+}
+
+extend type Mutation {
+  invokeAgent(input: InvokeAgentInput!): InvokeAgentResult!
+}
+
+extend type Query {
+  costs(from: Time!, to: Time!): CostSummary!
+}

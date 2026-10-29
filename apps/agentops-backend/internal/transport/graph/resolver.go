@@ -1,10 +1,17 @@
 package graph
 
-import "github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
+import (
+	"database/sql"
+
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/router"
+)
 
 // Resolver is the root dependency container for GraphQL resolvers.
 type Resolver struct {
 	AgentRepo *agent.Repository
+	Router    *router.Router
+	DB        *sql.DB
 }
 
 // queryResolver implements the generated QueryResolver interface.

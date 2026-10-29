@@ -1,4 +1,3 @@
-// internal/router/cache.go
 package router
 
 import (
@@ -9,9 +8,6 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-// modelCache provides a concurrency-safe cache for model specs.
-// It uses singleflight to collapse concurrent loads of the same key
-// into a single database query, preventing cache stampede under load.
 type modelCache struct {
 	db    *sql.DB
 	group singleflight.Group
@@ -26,9 +22,6 @@ func newModelCache(db *sql.DB) *modelCache {
 	}
 }
 
-// Get returns the spec for modelID. If the spec is not cached, it loads
-// it from the database. Concurrent callers for the same modelID share
-// a single database query.
 func (c *modelCache) Get(ctx context.Context, modelID string) (ModelSpec, error) {
 	c.mu.RLock()
 	if spec, ok := c.specs[modelID]; ok {

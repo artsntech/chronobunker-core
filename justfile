@@ -37,7 +37,7 @@ build:
 # Build and run the API server
 dev-api: check-infra build
     @echo "Starting API server..."
-    @./{{api_binary}}
+    -@./bin/chronobunker-api
 
 # Build and run the outbox/Kafka worker
 dev-worker: check-infra build

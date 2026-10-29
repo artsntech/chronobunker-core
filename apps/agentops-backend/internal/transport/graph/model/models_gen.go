@@ -3,13 +3,36 @@
 package model
 
 import (
+	"time"
+
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
 )
+
+type CostSummary struct {
+	TenantID   string    `json:"tenantId"`
+	TotalUsd   float64   `json:"totalUsd"`
+	EventCount int       `json:"eventCount"`
+	From       time.Time `json:"from"`
+	To         time.Time `json:"to"`
+}
 
 type CreateAgentInput struct {
 	Name        string  `json:"name"`
 	Department  string  `json:"department"`
 	TargetModel *string `json:"targetModel,omitempty"`
+}
+
+type InvokeAgentInput struct {
+	AgentID   string `json:"agentId"`
+	Prompt    string `json:"prompt"`
+	SessionID string `json:"sessionId"`
+}
+
+type InvokeAgentResult struct {
+	Completion string  `json:"completion"`
+	ModelID    string  `json:"modelId"`
+	CostUsd    float64 `json:"costUsd"`
+	LatencyMs  int     `json:"latencyMs"`
 }
 
 type Mutation struct {

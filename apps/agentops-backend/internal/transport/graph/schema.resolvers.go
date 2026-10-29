@@ -7,10 +7,13 @@ package graph
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph/model"
 )
 
@@ -64,3 +67,65 @@ func (r *queryResolver) Agent(ctx context.Context, id string) (*agent.Agent, err
 /*
 	func (r *Resolver) Agent() AgentResolver { return &agentResolver{r} }
 */
+
+// InvokeAgent is the resolver for the invokeAgent field.
+// It calls the model router with the agent's configured task type and
+// returns the completion, the model actually used (which may differ from the
+// target if the router fell back), the cost, and the latency.
+func (r *mutationResolver) InvokeAgent(ctx context.Context, input model.InvokeAgentInput) (*model.InvokeAgentResult, error) {
+	// Load the agent to determine its task type.
+	agentRecord, err := r.AgentRepo.GetByID(ctx, input.AgentID)
+	if err != nil {
+		return nil, fmt.Errorf("load agent: %w", err)
+	}
+
+	// The agent's department maps to a task type in the routing policy.
+	taskType := "triage"
+	if agentRecord.Department != "support" {
+		taskType = "reasoning"
+	}
+
+	start := time.Now()
+	completion, modelID, costUSD, err := r.Router.Route(ctx, taskType, input.Prompt, input.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("route: %w", err)
+	}
+	latency := time.Since(start)
+
+	return &model.InvokeAgentResult{
+		Completion: completion.Text,
+		ModelID:    modelID,
+		CostUsd:    costUSD,
+		LatencyMs:  int(latency.Milliseconds()),
+	}, nil
+}
+
+// Costs is the resolver for the costs field.
+// It aggregates cost_events for the current tenant over the given period.
+func (r *queryResolver) Costs(ctx context.Context, from time.Time, to time.Time) (*model.CostSummary, error) {
+	tenantID, err := db.TenantIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var totalUSD float64
+	var eventCount int
+	err = db.WithTenantTx(ctx, r.DB, func(tx *sql.Tx) error {
+		return tx.QueryRowContext(ctx, `
+			SELECT COALESCE(SUM(cost_usd), 0), COUNT(*)
+			FROM cost_events
+			WHERE created_at >= $1 AND created_at <= $2`,
+			from, to).Scan(&totalUSD, &eventCount)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("aggregate costs: %w", err)
+	}
+
+	return &model.CostSummary{
+		TenantID:   tenantID,
+		TotalUsd:   totalUSD,
+		EventCount: eventCount,
+		From:       from,
+		To:         to,
+	}, nil
+}

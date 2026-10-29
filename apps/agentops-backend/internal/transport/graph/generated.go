@@ -52,14 +52,31 @@ type ComplexityRoot struct {
 		UpdatedAt    func(childComplexity int) int
 	}
 
+	CostSummary struct {
+		EventCount func(childComplexity int) int
+		From       func(childComplexity int) int
+		TenantID   func(childComplexity int) int
+		To         func(childComplexity int) int
+		TotalUsd   func(childComplexity int) int
+	}
+
+	InvokeAgentResult struct {
+		Completion func(childComplexity int) int
+		CostUsd    func(childComplexity int) int
+		LatencyMs  func(childComplexity int) int
+		ModelID    func(childComplexity int) int
+	}
+
 	Mutation struct {
 		CreateAgent       func(childComplexity int, input model.CreateAgentInput) int
+		InvokeAgent       func(childComplexity int, input model.InvokeAgentInput) int
 		UpdateAgentStatus func(childComplexity int, input model.UpdateAgentStatusInput) int
 	}
 
 	Query struct {
 		Agent  func(childComplexity int, id string) int
 		Agents func(childComplexity int) int
+		Costs  func(childComplexity int, from time.Time, to time.Time) int
 	}
 }
 
@@ -74,10 +91,12 @@ type AgentResolver interface {
 type MutationResolver interface {
 	CreateAgent(ctx context.Context, input model.CreateAgentInput) (*agent.Agent, error)
 	UpdateAgentStatus(ctx context.Context, input model.UpdateAgentStatusInput) (*agent.Agent, error)
+	InvokeAgent(ctx context.Context, input model.InvokeAgentInput) (*model.InvokeAgentResult, error)
 }
 type QueryResolver interface {
 	Agents(ctx context.Context) ([]*agent.Agent, error)
 	Agent(ctx context.Context, id string) (*agent.Agent, error)
+	Costs(ctx context.Context, from time.Time, to time.Time) (*model.CostSummary, error)
 }
 
 // endregion ************************** generated!.gotpl **************************
@@ -159,6 +178,62 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Agent.UpdatedAt(childComplexity), true
 
+	case "CostSummary.eventCount":
+		if e.ComplexityRoot.CostSummary.EventCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CostSummary.EventCount(childComplexity), true
+	case "CostSummary.from":
+		if e.ComplexityRoot.CostSummary.From == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CostSummary.From(childComplexity), true
+	case "CostSummary.tenantId":
+		if e.ComplexityRoot.CostSummary.TenantID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CostSummary.TenantID(childComplexity), true
+	case "CostSummary.to":
+		if e.ComplexityRoot.CostSummary.To == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CostSummary.To(childComplexity), true
+	case "CostSummary.totalUsd":
+		if e.ComplexityRoot.CostSummary.TotalUsd == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CostSummary.TotalUsd(childComplexity), true
+
+	case "InvokeAgentResult.completion":
+		if e.ComplexityRoot.InvokeAgentResult.Completion == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InvokeAgentResult.Completion(childComplexity), true
+	case "InvokeAgentResult.costUsd":
+		if e.ComplexityRoot.InvokeAgentResult.CostUsd == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InvokeAgentResult.CostUsd(childComplexity), true
+	case "InvokeAgentResult.latencyMs":
+		if e.ComplexityRoot.InvokeAgentResult.LatencyMs == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InvokeAgentResult.LatencyMs(childComplexity), true
+	case "InvokeAgentResult.modelId":
+		if e.ComplexityRoot.InvokeAgentResult.ModelID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.InvokeAgentResult.ModelID(childComplexity), true
+
 	case "Mutation.createAgent":
 		if e.ComplexityRoot.Mutation.CreateAgent == nil {
 			break
@@ -170,6 +245,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateAgent(childComplexity, args["input"].(model.CreateAgentInput)), true
+	case "Mutation.invokeAgent":
+		if e.ComplexityRoot.Mutation.InvokeAgent == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_invokeAgent_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.InvokeAgent(childComplexity, args["input"].(model.InvokeAgentInput)), true
 	case "Mutation.updateAgentStatus":
 		if e.ComplexityRoot.Mutation.UpdateAgentStatus == nil {
 			break
@@ -199,6 +285,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Agents(childComplexity), true
+	case "Query.costs":
+		if e.ComplexityRoot.Query.Costs == nil {
+			break
+		}
+
+		args, err := ec.field_Query_costs_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.Costs(childComplexity, args["from"].(time.Time), args["to"].(time.Time)), true
 
 	}
 	return 0, false
@@ -210,6 +307,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	inputUnmarshalers := func() *graphql.InputUnmarshalerIndex {
 		return graphql.NewInputUnmarshalerIndex(
 			graphql.NewInputUnmarshaler("CreateAgentInput", ec.unmarshalInputCreateAgentInput),
+			graphql.NewInputUnmarshaler("InvokeAgentInput", ec.unmarshalInputInvokeAgentInput),
 			graphql.NewInputUnmarshaler("UpdateAgentStatusInput", ec.unmarshalInputUpdateAgentStatusInput),
 		)
 	}
@@ -330,6 +428,36 @@ func (ec *executionContext) childFields_Agent(ctx context.Context, field graphql
 		return ec.fieldContext_Agent_updatedAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Agent", field.Name)
+}
+
+func (ec *executionContext) childFields_CostSummary(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "tenantId":
+		return ec.fieldContext_CostSummary_tenantId(ctx, field)
+	case "totalUsd":
+		return ec.fieldContext_CostSummary_totalUsd(ctx, field)
+	case "eventCount":
+		return ec.fieldContext_CostSummary_eventCount(ctx, field)
+	case "from":
+		return ec.fieldContext_CostSummary_from(ctx, field)
+	case "to":
+		return ec.fieldContext_CostSummary_to(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type CostSummary", field.Name)
+}
+
+func (ec *executionContext) childFields_InvokeAgentResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "completion":
+		return ec.fieldContext_InvokeAgentResult_completion(ctx, field)
+	case "modelId":
+		return ec.fieldContext_InvokeAgentResult_modelId(ctx, field)
+	case "costUsd":
+		return ec.fieldContext_InvokeAgentResult_costUsd(ctx, field)
+	case "latencyMs":
+		return ec.fieldContext_InvokeAgentResult_latencyMs(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type InvokeAgentResult", field.Name)
 }
 
 func (ec *executionContext) childFields___Directive(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -462,6 +590,20 @@ func (ec *executionContext) field_Mutation_createAgent_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_invokeAgent_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.InvokeAgentInput, error) {
+			return ec.unmarshalNInvokeAgentInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐInvokeAgentInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_updateAgentStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -501,6 +643,28 @@ func (ec *executionContext) field_Query_agent_args(ctx context.Context, rawArgs 
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_costs_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "from",
+		func(ctx context.Context, v any) (time.Time, error) {
+			return ec.unmarshalNTime2timeᚐTime(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["from"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "to",
+		func(ctx context.Context, v any) (time.Time, error) {
+			return ec.unmarshalNTime2timeᚐTime(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["to"] = arg1
 	return args, nil
 }
 
@@ -808,6 +972,213 @@ func (ec *executionContext) fieldContext_Agent_updatedAt(_ context.Context, fiel
 	return graphql.NewScalarFieldContext("Agent", field, false, false, "Time")
 }
 
+func (ec *executionContext) _CostSummary_tenantId(ctx context.Context, field graphql.CollectedField, obj *model.CostSummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CostSummary_tenantId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TenantID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CostSummary_tenantId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CostSummary", field, false, false, "ID")
+}
+
+func (ec *executionContext) _CostSummary_totalUsd(ctx context.Context, field graphql.CollectedField, obj *model.CostSummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CostSummary_totalUsd(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalUsd, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CostSummary_totalUsd(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CostSummary", field, false, false, "Float")
+}
+
+func (ec *executionContext) _CostSummary_eventCount(ctx context.Context, field graphql.CollectedField, obj *model.CostSummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CostSummary_eventCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.EventCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CostSummary_eventCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CostSummary", field, false, false, "Int")
+}
+
+func (ec *executionContext) _CostSummary_from(ctx context.Context, field graphql.CollectedField, obj *model.CostSummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CostSummary_from(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.From, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CostSummary_from(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CostSummary", field, false, false, "Time")
+}
+
+func (ec *executionContext) _CostSummary_to(ctx context.Context, field graphql.CollectedField, obj *model.CostSummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CostSummary_to(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.To, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CostSummary_to(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CostSummary", field, false, false, "Time")
+}
+
+func (ec *executionContext) _InvokeAgentResult_completion(ctx context.Context, field graphql.CollectedField, obj *model.InvokeAgentResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InvokeAgentResult_completion(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Completion, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InvokeAgentResult_completion(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InvokeAgentResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _InvokeAgentResult_modelId(ctx context.Context, field graphql.CollectedField, obj *model.InvokeAgentResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InvokeAgentResult_modelId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ModelID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InvokeAgentResult_modelId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InvokeAgentResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _InvokeAgentResult_costUsd(ctx context.Context, field graphql.CollectedField, obj *model.InvokeAgentResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InvokeAgentResult_costUsd(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CostUsd, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InvokeAgentResult_costUsd(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InvokeAgentResult", field, false, false, "Float")
+}
+
+func (ec *executionContext) _InvokeAgentResult_latencyMs(ctx context.Context, field graphql.CollectedField, obj *model.InvokeAgentResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_InvokeAgentResult_latencyMs(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LatencyMs, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_InvokeAgentResult_latencyMs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("InvokeAgentResult", field, false, false, "Int")
+}
+
 func (ec *executionContext) _Mutation_createAgent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -896,6 +1267,50 @@ func (ec *executionContext) fieldContext_Mutation_updateAgentStatus(ctx context.
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_invokeAgent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_invokeAgent(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().InvokeAgent(ctx, fc.Args["input"].(model.InvokeAgentInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.InvokeAgentResult) graphql.Marshaler {
+			return ec.marshalNInvokeAgentResult2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐInvokeAgentResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_invokeAgent(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_InvokeAgentResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_invokeAgent_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_agents(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -966,6 +1381,50 @@ func (ec *executionContext) fieldContext_Query_agent(ctx context.Context, field 
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_agent_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_costs(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_costs(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().Costs(ctx, fc.Args["from"].(time.Time), fc.Args["to"].(time.Time))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.CostSummary) graphql.Marshaler {
+			return ec.marshalNCostSummary2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐCostSummary(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_costs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CostSummary(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_costs_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -2177,6 +2636,62 @@ func UnmarshalCreateAgentInput(ctx context.Context, raw any) (model.CreateAgentI
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputInvokeAgentInput(ctx context.Context, obj any) (model.InvokeAgentInput, error) {
+	var it model.InvokeAgentInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"agentId", "prompt", "sessionId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "agentId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("agentId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AgentID = data
+		case "prompt":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("prompt"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Prompt = data
+		case "sessionId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sessionId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SessionID = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalInvokeAgentInput unmarshals raw into the InvokeAgentInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalInvokeAgentInput(ctx context.Context, raw any) (model.InvokeAgentInput, error) {
+	var out model.InvokeAgentInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "InvokeAgentInput", raw, &out)
+	return out, err
+}
+
 func (ec *executionContext) unmarshalInputUpdateAgentStatusInput(ctx context.Context, obj any) (model.UpdateAgentStatusInput, error) {
 	var it model.UpdateAgentStatusInput
 	if obj == nil {
@@ -2314,6 +2829,107 @@ func (ec *executionContext) _Agent(ctx context.Context, sel ast.SelectionSet, ob
 	return out
 }
 
+var costSummaryImplementors = []string{"CostSummary"}
+
+func (ec *executionContext) _CostSummary(ctx context.Context, sel ast.SelectionSet, obj *model.CostSummary) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, costSummaryImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CostSummary")
+		case "tenantId":
+			out.Values[i] = ec._CostSummary_tenantId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalUsd":
+			out.Values[i] = ec._CostSummary_totalUsd(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "eventCount":
+			out.Values[i] = ec._CostSummary_eventCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "from":
+			out.Values[i] = ec._CostSummary_from(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "to":
+			out.Values[i] = ec._CostSummary_to(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var invokeAgentResultImplementors = []string{"InvokeAgentResult"}
+
+func (ec *executionContext) _InvokeAgentResult(ctx context.Context, sel ast.SelectionSet, obj *model.InvokeAgentResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, invokeAgentResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InvokeAgentResult")
+		case "completion":
+			out.Values[i] = ec._InvokeAgentResult_completion(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "modelId":
+			out.Values[i] = ec._InvokeAgentResult_modelId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "costUsd":
+			out.Values[i] = ec._InvokeAgentResult_costUsd(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "latencyMs":
+			out.Values[i] = ec._InvokeAgentResult_latencyMs(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -2343,6 +2959,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateAgentStatus":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateAgentStatus(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "invokeAgent":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_invokeAgent(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -2394,6 +3017,12 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				true, false,
 				func(ctx context.Context) graphql.Marshaler {
 					return ec._Query_agent(ctx, field)
+				})
+		case "costs":
+			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
+				true, true,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Query_costs(ctx, field)
 				})
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -2841,6 +3470,14 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) marshalNCostSummary2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐCostSummary(ctx context.Context, sel ast.SelectionSet, v *model.CostSummary) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "CostSummary!")
+		return graphql.Null
+	}
+	return ec._CostSummary(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNCreateAgentInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐCreateAgentInput(ctx context.Context, v any) (model.CreateAgentInput, error) {
 	res, err := ec.unmarshalInputCreateAgentInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -2872,6 +3509,33 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 		graphql.AddInvalidNullFromMarshaler(ctx, "ID!")
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalInt(v)
+	if res == graphql.Null {
+		graphql.AddInvalidNullFromMarshaler(ctx, "Int!")
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNInvokeAgentInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐInvokeAgentInput(ctx context.Context, v any) (model.InvokeAgentInput, error) {
+	res, err := ec.unmarshalInputInvokeAgentInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInvokeAgentResult2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐInvokeAgentResult(ctx context.Context, sel ast.SelectionSet, v *model.InvokeAgentResult) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "InvokeAgentResult!")
+		return graphql.Null
+	}
+	return ec._InvokeAgentResult(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
