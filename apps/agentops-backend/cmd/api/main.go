@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/playground"
 	_ "github.com/lib/pq"
 	"github.com/ravilushqa/otelgqlgen"
@@ -34,9 +36,28 @@ func main() {
 		log.Fatal("CHRONO_REDIS_ADDR is required")
 	}
 	pubKeyPath := os.Getenv("CHRONO_JWT_PUBLIC_KEY_PATH")
-	if pubKeyPath == "" {
-		log.Fatal("CHRONO_JWT_PUBLIC_KEY_PATH is required")
+if pubKeyPath == "" {
+	log.Fatal("CHRONO_JWT_PUBLIC_KEY_PATH is required")
+}
+if abs, err := filepath.Abs(pubKeyPath); err == nil {
+	pubKeyPath = abs
+}
+log.Printf("JWT public key: %s", pubKeyPath)
+
+	// The routing policy path is configurable so that the binary can be run
+	// from any working directory. Defaults to policies/routing.yaml relative
+	// to the working directory.
+	policyPath := os.Getenv("CHRONO_ROUTING_POLICY_PATH")
+	if policyPath == "" {
+		policyPath = "policies/routing.yaml"
 	}
+	// Resolve to an absolute path so that the router works regardless of
+	// where the binary is invoked from.
+	if abs, err := filepath.Abs(policyPath); err == nil {
+		policyPath = abs
+	}
+
+	log.Printf("routing policy: %s", policyPath)
 
 	database, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -44,9 +65,7 @@ func main() {
 	}
 	defer database.Close()
 
-	// Connection pool tuning. MaxOpenConns bounds the number of concurrent
-	// database connections; without it, a traffic spike exhausts the Postgres
-	// max_connections limit and every tenant suffers.
+	// Connection pool tuning.
 	database.SetMaxOpenConns(25)
 	database.SetMaxIdleConns(25)
 	database.SetConnMaxLifetime(5 * time.Minute)
@@ -79,7 +98,7 @@ func main() {
 	rateLimit := middleware.NewRateLimit(rdb, 100)
 
 	breakerInstance := breaker.New(rdb, database, breaker.DefaultConfig())
-	modelRouter, err := router.NewRouter(database, &router.MockProvider{}, breakerInstance, "policies/routing.yaml")
+	modelRouter, err := router.NewRouter(database, &router.MockProvider{}, breakerInstance, policyPath)
 	if err != nil {
 		log.Fatalf("init router: %v", err)
 	}
@@ -91,41 +110,38 @@ func main() {
 			DB:        database,
 		},
 	}))
+	srv.Use(extension.FixedComplexityLimit(200))
 	srv.Use(otelgqlgen.Middleware())
 
-	// Chain: security headers -> auth -> rate limit -> graphql.
-	/*graphqlHandler := middleware.SecurityHeaders(
-		auth.Middleware(rateLimit.Middleware(srv)),
-	)*/
 	graphqlHandler := auth.Middleware(rateLimit.Middleware(srv))
 
+	ipRateLimit := middleware.NewIPRateLimit(rdb, 20, 10*time.Second) // 20 req per 10s per IP
+
 	mux := http.NewServeMux()
-// graphqlHandler already includes SecurityHeaders, auth, and rate limit.
-mux.Handle("/query", graphqlHandler)
-mux.Handle("/", playground.Handler("ChronoBunker", "/query"))
-mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(`{"status":"ok"}`))
-})
+	mux.Handle("/query", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		graphqlHandler.ServeHTTP(w, r)
+	}))
+mux.Handle("/playground", ipRateLimit.Middleware(playground.Handler("ChronoBunker", "/query")))
+mux.Handle("/playground/", ipRateLimit.Middleware(playground.Handler("ChronoBunker", "/query")))
+	mux.Handle("/healthz", ipRateLimit.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("healthz handler called: path=%q", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})))
 
-// Wrap the entire mux with SecurityHeaders so that every response, including
-// /healthz and /playground, carries the defensive headers. The graphqlHandler
-// also has SecurityHeaders inside it, but that is idempotent: setting the same
-// headers twice is harmless.
-handlerWithHeaders := middleware.SecurityHeaders(mux)
+	handlerWithHeaders := middleware.SecurityHeaders(mux)
 
-httpSrv := &http.Server{
-	Addr:              ":8080",
-	Handler:           handlerWithHeaders,
-		ReadHeaderTimeout: 5 * time.Second,   // guards against Slowloris
-		ReadTimeout:       15 * time.Second,  // bounds the entire request read
-		WriteTimeout:      15 * time.Second,  // bounds the response write
-		IdleTimeout:       60 * time.Second,  // keep-alive idle timeout
-		MaxHeaderBytes:    1 << 20,           // 1 MiB header cap
+	httpSrv := &http.Server{
+		Addr:              ":8080",
+		Handler:           handlerWithHeaders,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
-	// Graceful shutdown: on SIGINT or SIGTERM, stop accepting new connections,
-	// wait for in-flight requests to finish (up to 15 seconds), then exit.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
