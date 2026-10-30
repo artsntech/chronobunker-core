@@ -49,6 +49,12 @@ type InvokeToolResult struct {
 	Executed bool           `json:"executed"`
 }
 
+type LoginResult struct {
+	Token    string `json:"token"`
+	TenantID string `json:"tenantId"`
+	DeviceID string `json:"deviceId"`
+}
+
 type Mutation struct {
 }
 

@@ -140,6 +140,18 @@ func main() {
 		}, nil
 	})
 
+	privKeyPath := os.Getenv("CHRONO_JWT_PRIVATE_KEY_PATH")
+	if privKeyPath == "" {
+		privKeyPath = "secrets/jwt_private.pem"
+	}
+	if abs, err := filepath.Abs(privKeyPath); err == nil {
+		privKeyPath = abs
+	}
+	jwtIssuer, err := security.NewJWTIssuer(privKeyPath)
+	if err != nil {
+		log.Fatalf("init jwt issuer: %v", err)
+	}
+
 	es := graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{
 			AgentRepo:    agent.NewRepository(database),
@@ -147,6 +159,8 @@ func main() {
 			DB:           database,
 			TokenService: tokenService,
 			Gateway:      gateway,
+			Breaker:      breakerInstance, // NEW
+			JWTIssuer: 	  jwtIssuer, // NEW
 		},
 	})
 
@@ -178,15 +192,15 @@ func main() {
 	// a query with a single field repeated 200 times has low complexity
 	// but high depth. This extension enforces the depth independently.
 	srv.AroundOperations(func(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
-	oc := graphql.GetOperationContext(ctx)
-	for _, op := range oc.Doc.Operations {
-		if d := countDepth(op.SelectionSet); d > 10 {
-			return graphql.OneShot(graphql.ErrorResponse(ctx,
-				"query depth %d exceeds limit 10", d))
+		oc := graphql.GetOperationContext(ctx)
+		for _, op := range oc.Doc.Operations {
+			if d := countDepth(op.SelectionSet); d > 10 {
+				return graphql.OneShot(graphql.ErrorResponse(ctx,
+					"query depth %d exceeds limit 10", d))
+			}
 		}
-	}
-	return next(ctx)
-})
+		return next(ctx)
+	})
 	srv.Use(otelgqlgen.Middleware())
 
 	graphqlHandler := auth.Middleware(rateLimit.Middleware(srv))
@@ -208,9 +222,11 @@ func main() {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})))
 
-	handlerWithHeaders := middleware.SecurityHeaders(
+	handlerWithHeaders := middleware.CORS(
+	middleware.SecurityHeaders(
 		middleware.Logging(logger)(mux),
-	)
+	),
+)
 
 	httpSrv := &http.Server{
 		Addr:              ":8080",

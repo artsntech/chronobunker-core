@@ -17,6 +17,7 @@ type Agent {
   healthScore: Float!
   allowedTools: [String!]!
   targetModel: String!
+  breakerState: String!
   createdAt: Time!
   updatedAt: Time!
 }
@@ -78,4 +79,14 @@ type Mutation {
   updateAgentStatus(input: UpdateAgentStatusInput!): Agent!
   invokeAgent(input: InvokeAgentInput!): InvokeAgentResult!
   invokeTool(input: InvokeToolInput!): InvokeToolResult!
+}
+
+type LoginResult {
+  token: String!
+  tenantId: ID!
+  deviceId: String!
+}
+
+extend type Mutation {
+  login(tenantId: ID!): LoginResult!
 }

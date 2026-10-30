@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/breaker"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph/model"
@@ -98,9 +99,6 @@ func (r *mutationResolver) InvokeAgent(ctx context.Context, input model.InvokeAg
 	}, nil
 }
 
-// InvokeTool issues an ephemeral capability token for the agent's allowed
-// tools and then calls the security Gateway. The Gateway enforces
-// resource binding, device binding, schema validation, and idempotency.
 func (r *mutationResolver) InvokeTool(ctx context.Context, input model.InvokeToolInput) (*model.InvokeToolResult, error) {
 	agentRecord, err := r.AgentRepo.GetByID(ctx, input.AgentID)
 	if err != nil {
@@ -140,4 +138,29 @@ func (r *mutationResolver) InvokeTool(ctx context.Context, input model.InvokeToo
 		Cached:   toolResult.Cached,
 		Executed: toolResult.Executed,
 	}, nil
+}
+
+func (r *mutationResolver) Login(ctx context.Context, tenantID string) (*model.LoginResult, error) {
+	deviceID := fmt.Sprintf("web-device-%d", time.Now().UnixNano())
+
+	token, err := r.JWTIssuer.Issue(tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("issue jwt: %w", err)
+	}
+
+	return &model.LoginResult{
+		Token:    token,
+		TenantID: tenantID,
+		DeviceID: deviceID,
+	}, nil
+}
+
+// ── Agent field resolvers ────────────────────────────────────────
+
+func (r *agentResolver) BreakerState(ctx context.Context, obj *agent.Agent) (string, error) {
+	state, err := r.Breaker.State(ctx, breaker.TargetModel, obj.TargetModel)
+	if err != nil {
+		return "CLOSED", nil // fail-safe: assume closed on Redis error
+	}
+	return string(state), nil
 }

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/breaker"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/router"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
 )
@@ -15,10 +16,14 @@ type Resolver struct {
 	DB           *sql.DB
 	TokenService *security.TokenService
 	Gateway      *security.Gateway
+	Breaker      *breaker.Breaker
+	JWTIssuer    *security.JWTIssuer
 }
 
 type queryResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
+type agentResolver struct{ *Resolver }
 
 func (r *Resolver) Query() QueryResolver       { return &queryResolver{r} }
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
+func (r *Resolver) Agent() AgentResolver       { return &agentResolver{r} }

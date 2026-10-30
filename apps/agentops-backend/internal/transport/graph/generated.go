@@ -30,6 +30,7 @@ func NewExecutableSchema(cfg Config) graphql.ExecutableSchema {
 type Config = graphql.Config[ResolverRoot, DirectiveRoot, ComplexityRoot]
 
 type ResolverRoot interface {
+	Agent() AgentResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 }
@@ -40,6 +41,7 @@ type DirectiveRoot struct {
 type ComplexityRoot struct {
 	Agent struct {
 		AllowedTools func(childComplexity int) int
+		BreakerState func(childComplexity int) int
 		CreatedAt    func(childComplexity int) int
 		Department   func(childComplexity int) int
 		HealthScore  func(childComplexity int) int
@@ -72,10 +74,17 @@ type ComplexityRoot struct {
 		Result   func(childComplexity int) int
 	}
 
+	LoginResult struct {
+		DeviceID func(childComplexity int) int
+		TenantID func(childComplexity int) int
+		Token    func(childComplexity int) int
+	}
+
 	Mutation struct {
 		CreateAgent       func(childComplexity int, input model.CreateAgentInput) int
 		InvokeAgent       func(childComplexity int, input model.InvokeAgentInput) int
 		InvokeTool        func(childComplexity int, input model.InvokeToolInput) int
+		Login             func(childComplexity int, tenantID string) int
 		UpdateAgentStatus func(childComplexity int, input model.UpdateAgentStatusInput) int
 	}
 
@@ -90,11 +99,15 @@ type ComplexityRoot struct {
 
 // region    ************************** generated!.gotpl **************************
 
+type AgentResolver interface {
+	BreakerState(ctx context.Context, obj *agent.Agent) (string, error)
+}
 type MutationResolver interface {
 	CreateAgent(ctx context.Context, input model.CreateAgentInput) (*agent.Agent, error)
 	UpdateAgentStatus(ctx context.Context, input model.UpdateAgentStatusInput) (*agent.Agent, error)
 	InvokeAgent(ctx context.Context, input model.InvokeAgentInput) (*model.InvokeAgentResult, error)
 	InvokeTool(ctx context.Context, input model.InvokeToolInput) (*model.InvokeToolResult, error)
+	Login(ctx context.Context, tenantID string) (*model.LoginResult, error)
 }
 type QueryResolver interface {
 	Agents(ctx context.Context) ([]*agent.Agent, error)
@@ -126,6 +139,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Agent.AllowedTools(childComplexity), true
+	case "Agent.breakerState":
+		if e.ComplexityRoot.Agent.BreakerState == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Agent.BreakerState(childComplexity), true
 	case "Agent.createdAt":
 		if e.ComplexityRoot.Agent.CreatedAt == nil {
 			break
@@ -256,6 +275,25 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.InvokeToolResult.Result(childComplexity), true
 
+	case "LoginResult.deviceId":
+		if e.ComplexityRoot.LoginResult.DeviceID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.LoginResult.DeviceID(childComplexity), true
+	case "LoginResult.tenantId":
+		if e.ComplexityRoot.LoginResult.TenantID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.LoginResult.TenantID(childComplexity), true
+	case "LoginResult.token":
+		if e.ComplexityRoot.LoginResult.Token == nil {
+			break
+		}
+
+		return e.ComplexityRoot.LoginResult.Token(childComplexity), true
+
 	case "Mutation.createAgent":
 		if e.ComplexityRoot.Mutation.CreateAgent == nil {
 			break
@@ -289,6 +327,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.InvokeTool(childComplexity, args["input"].(model.InvokeToolInput)), true
+	case "Mutation.login":
+		if e.ComplexityRoot.Mutation.Login == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_login_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.Login(childComplexity, args["tenantId"].(string)), true
 	case "Mutation.updateAgentStatus":
 		if e.ComplexityRoot.Mutation.UpdateAgentStatus == nil {
 			break
@@ -456,6 +505,8 @@ func (ec *executionContext) childFields_Agent(ctx context.Context, field graphql
 		return ec.fieldContext_Agent_allowedTools(ctx, field)
 	case "targetModel":
 		return ec.fieldContext_Agent_targetModel(ctx, field)
+	case "breakerState":
+		return ec.fieldContext_Agent_breakerState(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_Agent_createdAt(ctx, field)
 	case "updatedAt":
@@ -504,6 +555,18 @@ func (ec *executionContext) childFields_InvokeToolResult(ctx context.Context, fi
 		return ec.fieldContext_InvokeToolResult_executed(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type InvokeToolResult", field.Name)
+}
+
+func (ec *executionContext) childFields_LoginResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "token":
+		return ec.fieldContext_LoginResult_token(ctx, field)
+	case "tenantId":
+		return ec.fieldContext_LoginResult_tenantId(ctx, field)
+	case "deviceId":
+		return ec.fieldContext_LoginResult_deviceId(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type LoginResult", field.Name)
 }
 
 func (ec *executionContext) childFields___Directive(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -661,6 +724,20 @@ func (ec *executionContext) field_Mutation_invokeTool_args(ctx context.Context, 
 		return nil, err
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "tenantId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["tenantId"] = arg0
 	return args, nil
 }
 
@@ -986,6 +1063,29 @@ func (ec *executionContext) fieldContext_Agent_targetModel(_ context.Context, fi
 	return graphql.NewScalarFieldContext("Agent", field, false, false, "String")
 }
 
+func (ec *executionContext) _Agent_breakerState(ctx context.Context, field graphql.CollectedField, obj *agent.Agent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Agent_breakerState(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Agent().BreakerState(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Agent_breakerState(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Agent", field, true, true, "String")
+}
+
 func (ec *executionContext) _Agent_createdAt(ctx context.Context, field graphql.CollectedField, obj *agent.Agent) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1308,6 +1408,75 @@ func (ec *executionContext) fieldContext_InvokeToolResult_executed(_ context.Con
 	return graphql.NewScalarFieldContext("InvokeToolResult", field, false, false, "Boolean")
 }
 
+func (ec *executionContext) _LoginResult_token(ctx context.Context, field graphql.CollectedField, obj *model.LoginResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_LoginResult_token(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Token, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_LoginResult_token(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("LoginResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _LoginResult_tenantId(ctx context.Context, field graphql.CollectedField, obj *model.LoginResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_LoginResult_tenantId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TenantID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_LoginResult_tenantId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("LoginResult", field, false, false, "ID")
+}
+
+func (ec *executionContext) _LoginResult_deviceId(ctx context.Context, field graphql.CollectedField, obj *model.LoginResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_LoginResult_deviceId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DeviceID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_LoginResult_deviceId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("LoginResult", field, false, false, "String")
+}
+
 func (ec *executionContext) _Mutation_createAgent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1478,6 +1647,50 @@ func (ec *executionContext) fieldContext_Mutation_invokeTool(ctx context.Context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_invokeTool_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_login(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().Login(ctx, fc.Args["tenantId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.LoginResult) graphql.Marshaler {
+			return ec.marshalNLoginResult2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐLoginResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_login(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_LoginResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_login_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -3006,52 +3219,58 @@ func (ec *executionContext) _Agent(ctx context.Context, sel ast.SelectionSet, ob
 		case "id":
 			out.Values[i] = ec._Agent_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "tenantId":
 			out.Values[i] = ec._Agent_tenantId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "name":
 			out.Values[i] = ec._Agent_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "department":
 			out.Values[i] = ec._Agent_department(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "status":
 			out.Values[i] = ec._Agent_status(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "healthScore":
 			out.Values[i] = ec._Agent_healthScore(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "allowedTools":
 			out.Values[i] = ec._Agent_allowedTools(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "targetModel":
 			out.Values[i] = ec._Agent_targetModel(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "breakerState":
+			out.ResolveConcurrently(ec.OperationContext, &deferred, i,
+				true, true,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Agent_breakerState(ctx, field, obj)
+				})
 		case "createdAt":
 			out.Values[i] = ec._Agent_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Agent_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -3214,6 +3433,49 @@ func (ec *executionContext) _InvokeToolResult(ctx context.Context, sel ast.Selec
 	return out
 }
 
+var loginResultImplementors = []string{"LoginResult"}
+
+func (ec *executionContext) _LoginResult(ctx context.Context, sel ast.SelectionSet, obj *model.LoginResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, loginResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("LoginResult")
+		case "token":
+			out.Values[i] = ec._LoginResult_token(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "tenantId":
+			out.Values[i] = ec._LoginResult_tenantId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deviceId":
+			out.Values[i] = ec._LoginResult_deviceId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -3257,6 +3519,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "invokeTool":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_invokeTool(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "login":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_login(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -3858,6 +4127,14 @@ func (ec *executionContext) marshalNJSON2map(ctx context.Context, sel ast.Select
 		graphql.AddInvalidNullFromMarshaler(ctx, "JSON!")
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNLoginResult2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐLoginResult(ctx context.Context, sel ast.SelectionSet, v *model.LoginResult) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "LoginResult!")
+		return graphql.Null
+	}
+	return ec._LoginResult(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
