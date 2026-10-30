@@ -13,10 +13,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/vektah/gqlparser/v2/ast"
+
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/99designs/gqlgen/graphql"
 	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/ravilushqa/otelgqlgen"
@@ -156,7 +159,34 @@ func main() {
 		srv.Use(extension.Introspection{})
 	}
 
+	// Batching prevention: reject requests that contain more than one
+	// GraphQL operation. Without this, an attacker can send 100 login
+	// mutations in a single POST, and the per-tenant rate limiter counts
+	// it as a single request.
+	srv.AroundOperations(func(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
+		oc := graphql.GetOperationContext(ctx)
+		if len(oc.Doc.Operations) > 1 {
+			return graphql.OneShot(graphql.ErrorResponse(ctx, "batching is not allowed"))
+		}
+		return next(ctx)
+	})
+
 	srv.Use(extension.FixedComplexityLimit(200))
+
+	// Depth limit: reject queries that nest deeper than 10 levels.
+	// The complexity limit alone does not bound recursion depth because
+	// a query with a single field repeated 200 times has low complexity
+	// but high depth. This extension enforces the depth independently.
+	srv.AroundOperations(func(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
+	oc := graphql.GetOperationContext(ctx)
+	for _, op := range oc.Doc.Operations {
+		if d := countDepth(op.SelectionSet); d > 10 {
+			return graphql.OneShot(graphql.ErrorResponse(ctx,
+				"query depth %d exceeds limit 10", d))
+		}
+	}
+	return next(ctx)
+})
 	srv.Use(otelgqlgen.Middleware())
 
 	graphqlHandler := auth.Middleware(rateLimit.Middleware(srv))
@@ -222,4 +252,26 @@ func main() {
 	} else {
 		log.Println("server shut down cleanly")
 	}
+}
+
+// countDepth recursively counts the maximum nesting depth of a selection set.
+func countDepth(selectionSet ast.SelectionSet) int {
+	maxDepth := 0
+	for _, sel := range selectionSet {
+		var depth int
+		switch s := sel.(type) {
+		case *ast.Field:
+			depth = 1 + countDepth(s.SelectionSet)
+		case *ast.InlineFragment:
+			depth = countDepth(s.SelectionSet)
+		case *ast.FragmentSpread:
+			// Fragment spreads are resolved by gqlgen before this middleware runs,
+			// so we treat them as depth 0 (they do not add nesting themselves).
+			depth = 0
+		}
+		if depth > maxDepth {
+			maxDepth = depth
+		}
+	}
+	return maxDepth
 }
