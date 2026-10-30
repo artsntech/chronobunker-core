@@ -1,5 +1,6 @@
 {
     "go.formatOnSave": true,
     "go.formatTool": "gofmt",
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "typescript.tsdk": "node_modules/typescript/lib"
 }

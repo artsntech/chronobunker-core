@@ -30,11 +30,17 @@ func NewRateLimit(rdb *redis.Client, perSecond int) *RateLimit {
 
 // Middleware enforces the rate limit. It must run after Auth.Middleware so
 // that the tenant ID is already in the context.
+// Middleware enforces the rate limit. It must run after Auth.Middleware so
+// that the tenant ID is already in the context.
 func (rl *RateLimit) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tenantID, err := db.TenantIDFromContext(r.Context())
 		if err != nil {
-			http.Error(w, `{"error":"rate limit: missing tenant context"}`, http.StatusInternalServerError)
+			// No tenant: this is an unauthenticated request (e.g. login).
+			// The IP rate limiter on the /query handler already bounds it.
+			// Pass through; resolvers that require a tenant will fail
+			// with an explicit error.
+			next.ServeHTTP(w, r)
 			return
 		}
 

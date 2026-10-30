@@ -53,7 +53,9 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := r.Header.Get("Authorization")
 		if header == "" {
-			http.Error(w, `{"error":"missing authorization header"}`, http.StatusUnauthorized)
+			// No token: pass through. Resolvers that require a tenant will
+			// fail with an explicit error when they call db.TenantIDFromContext.
+			next.ServeHTTP(w, r)
 			return
 		}
 
