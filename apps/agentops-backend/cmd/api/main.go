@@ -10,23 +10,26 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
-	"github.com/vektah/gqlparser/v2/ast"
-
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
-	"github.com/99designs/gqlgen/graphql"
+	coderws "github.com/coder/websocket"
 	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/ravilushqa/otelgqlgen"
 	"github.com/redis/go-redis/v9"
+	"github.com/vektah/gqlparser/v2/ast"
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/audit"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/breaker"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/router"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph"
@@ -107,6 +110,14 @@ func main() {
 
 	breakerInstance := breaker.New(rdb, database, breaker.DefaultConfig())
 
+	// Start the audit hub. It listens on the Postgres NOTIFY channel and
+	// fans out new audit entries to GraphQL subscribers.
+	auditHub, err := audit.NewHub(dbURL, database)
+	if err != nil {
+		log.Fatalf("init audit hub: %v", err)
+	}
+	go auditHub.Start(context.Background())
+
 	groqProvider, err := router.NewGroqProvider("openai/gpt-oss-120b")
 	if err != nil {
 		log.Fatalf("init groq provider: %v", err)
@@ -123,16 +134,12 @@ func main() {
 		log.Fatalf("init router: %v", err)
 	}
 
-	// Capability token service and tool gateway.
 	tokenService, err := security.NewTokenService()
 	if err != nil {
 		log.Fatalf("init token service: %v", err)
 	}
 
 	gateway := security.NewGateway(database, tokenService, func(ctx context.Context, toolName string, params map[string]any) (any, error) {
-		// In production, this dispatches to the real tool implementations
-		// (Stripe for refunds, SendGrid for emails, etc.). For now, it
-		// returns a synthetic result so the end-to-end flow is exercised.
 		return map[string]any{
 			"tool":   toolName,
 			"params": params,
@@ -159,12 +166,41 @@ func main() {
 			DB:           database,
 			TokenService: tokenService,
 			Gateway:      gateway,
-			Breaker:      breakerInstance, // NEW
-			JWTIssuer: 	  jwtIssuer, // NEW
+			Breaker:      breakerInstance,
+			JWTIssuer:    jwtIssuer,
+			AuditHub:     auditHub,
 		},
 	})
 
 	srv := handler.New(es)
+
+	// WebSocket transport for GraphQL Subscriptions.
+	// The InitFunc authenticates the handshake: the client sends the JWT
+	// in connectionParams.Authorization, and we inject the tenant_id into
+	// the context so resolvers can enforce RLS.
+	srv.AddTransport(transport.Websocket{
+		KeepAlivePingInterval: 10 * time.Second,
+		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
+			token, _ := initPayload["Authorization"].(string)
+			if token == "" {
+				return ctx, nil, errors.New("missing authorization")
+			}
+			token = strings.TrimPrefix(token, "Bearer ")
+			tenantID, err := auth.ValidateAndExtractTenant(token)
+			if err != nil {
+				return ctx, nil, err
+			}
+			return db.WithTenantID(ctx, tenantID), nil, nil
+		},
+		Implementation: transport.CoderWebsocketImplementation{
+			AcceptOptions: coderws.AcceptOptions{
+				// OriginPatterns is mandatory: without it, any origin can
+				// open an authenticated WebSocket (CSWSH).
+				OriginPatterns: []string{"localhost:5173"},
+				Subprotocols:   []string{"graphql-transport-ws", "graphql-ws"},
+			},
+		},
+	})
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.POST{})
 	srv.AddTransport(transport.GET{})
@@ -173,10 +209,7 @@ func main() {
 		srv.Use(extension.Introspection{})
 	}
 
-	// Batching prevention: reject requests that contain more than one
-	// GraphQL operation. Without this, an attacker can send 100 login
-	// mutations in a single POST, and the per-tenant rate limiter counts
-	// it as a single request.
+	// Batching prevention: one operation per HTTP request.
 	srv.AroundOperations(func(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
 		oc := graphql.GetOperationContext(ctx)
 		if len(oc.Doc.Operations) > 1 {
@@ -187,10 +220,7 @@ func main() {
 
 	srv.Use(extension.FixedComplexityLimit(200))
 
-	// Depth limit: reject queries that nest deeper than 10 levels.
-	// The complexity limit alone does not bound recursion depth because
-	// a query with a single field repeated 200 times has low complexity
-	// but high depth. This extension enforces the depth independently.
+	// Depth limit: independent of the complexity limit.
 	srv.AroundOperations(func(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
 		oc := graphql.GetOperationContext(ctx)
 		for _, op := range oc.Doc.Operations {
@@ -201,6 +231,7 @@ func main() {
 		}
 		return next(ctx)
 	})
+
 	srv.Use(otelgqlgen.Middleware())
 
 	graphqlHandler := auth.Middleware(rateLimit.Middleware(srv))
@@ -223,10 +254,10 @@ func main() {
 	})))
 
 	handlerWithHeaders := middleware.CORS(
-	middleware.SecurityHeaders(
-		middleware.Logging(logger)(mux),
-	),
-)
+		middleware.SecurityHeaders(
+			middleware.Logging(logger)(mux),
+		),
+	)
 
 	httpSrv := &http.Server{
 		Addr:              ":8080",
@@ -270,7 +301,6 @@ func main() {
 	}
 }
 
-// countDepth recursively counts the maximum nesting depth of a selection set.
 func countDepth(selectionSet ast.SelectionSet) int {
 	maxDepth := 0
 	for _, sel := range selectionSet {
@@ -281,8 +311,6 @@ func countDepth(selectionSet ast.SelectionSet) int {
 		case *ast.InlineFragment:
 			depth = countDepth(s.SelectionSet)
 		case *ast.FragmentSpread:
-			// Fragment spreads are resolved by gqlgen before this middleware runs,
-			// so we treat them as depth 0 (they do not add nesting themselves).
 			depth = 0
 		}
 		if depth > maxDepth {

@@ -100,3 +100,33 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
+
+// ValidateAndExtractTenant validates a JWT string and returns the tenant ID.
+// Used by the WebSocket InitFunc to authenticate the connection handshake.
+func (a *Auth) ValidateAndExtractTenant(tokenString string) (string, error) {
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		claims,
+		func(t *jwt.Token) (any, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			}
+			return a.publicKey, nil
+		},
+		jwt.WithValidMethods([]string{"RS256"}),
+		jwt.WithIssuer("chronobunker"),
+		jwt.WithAudience("chronobunker-api"),
+		jwt.WithExpirationRequired(),
+	)
+	if err != nil {
+		return "", err
+	}
+	if !token.Valid {
+		return "", fmt.Errorf("invalid token")
+	}
+	if claims.TenantID == "" {
+		return "", fmt.Errorf("missing tenant claim")
+	}
+	return claims.TenantID, nil
+}

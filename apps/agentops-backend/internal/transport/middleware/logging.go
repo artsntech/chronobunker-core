@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"bufio"
+	"net"
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/telemetry"
@@ -50,4 +52,14 @@ func Logging(logger *slog.Logger) func(http.Handler) http.Handler {
 			).Inc()
 		})
 	}
+}
+
+// Hijack delegates to the underlying ResponseWriter so that WebSocket
+// upgrades can hijack the TCP connection. Without this, any middleware
+// that wraps the writer blocks the WebSocket handshake.
+func (r *responseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h, ok := r.ResponseWriter.(http.Hijacker); ok {
+		return h.Hijack()
+	}
+	return nil, nil, http.ErrNotSupported
 }

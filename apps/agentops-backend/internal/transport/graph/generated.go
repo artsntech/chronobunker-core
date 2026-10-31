@@ -33,6 +33,7 @@ type ResolverRoot interface {
 	Agent() AgentResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
+	Subscription() SubscriptionResolver
 }
 
 type DirectiveRoot struct {
@@ -51,6 +52,17 @@ type ComplexityRoot struct {
 		TargetModel  func(childComplexity int) int
 		TenantID     func(childComplexity int) int
 		UpdatedAt    func(childComplexity int) int
+	}
+
+	AuditEntry struct {
+		CreatedAt func(childComplexity int) int
+		Decision  func(childComplexity int) int
+		ID        func(childComplexity int) int
+		PrevHash  func(childComplexity int) int
+		RowHash   func(childComplexity int) int
+		SessionID func(childComplexity int) int
+		TenantID  func(childComplexity int) int
+		ToolName  func(childComplexity int) int
 	}
 
 	CostSummary struct {
@@ -89,9 +101,14 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Agent  func(childComplexity int, id string) int
-		Agents func(childComplexity int) int
-		Costs  func(childComplexity int, from time.Time, to time.Time) int
+		Agent        func(childComplexity int, id string) int
+		Agents       func(childComplexity int) int
+		AuditEntries func(childComplexity int, limit int) int
+		Costs        func(childComplexity int, from time.Time, to time.Time) int
+	}
+
+	Subscription struct {
+		AuditEntryAdded func(childComplexity int) int
 	}
 }
 
@@ -113,6 +130,10 @@ type QueryResolver interface {
 	Agents(ctx context.Context) ([]*agent.Agent, error)
 	Agent(ctx context.Context, id string) (*agent.Agent, error)
 	Costs(ctx context.Context, from time.Time, to time.Time) (*model.CostSummary, error)
+	AuditEntries(ctx context.Context, limit int) ([]*model.AuditEntry, error)
+}
+type SubscriptionResolver interface {
+	AuditEntryAdded(ctx context.Context) (<-chan *model.AuditEntry, error)
 }
 
 // endregion ************************** generated!.gotpl **************************
@@ -199,6 +220,55 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Agent.UpdatedAt(childComplexity), true
+
+	case "AuditEntry.createdAt":
+		if e.ComplexityRoot.AuditEntry.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AuditEntry.CreatedAt(childComplexity), true
+	case "AuditEntry.decision":
+		if e.ComplexityRoot.AuditEntry.Decision == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AuditEntry.Decision(childComplexity), true
+	case "AuditEntry.id":
+		if e.ComplexityRoot.AuditEntry.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AuditEntry.ID(childComplexity), true
+	case "AuditEntry.prevHash":
+		if e.ComplexityRoot.AuditEntry.PrevHash == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AuditEntry.PrevHash(childComplexity), true
+	case "AuditEntry.rowHash":
+		if e.ComplexityRoot.AuditEntry.RowHash == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AuditEntry.RowHash(childComplexity), true
+	case "AuditEntry.sessionId":
+		if e.ComplexityRoot.AuditEntry.SessionID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AuditEntry.SessionID(childComplexity), true
+	case "AuditEntry.tenantId":
+		if e.ComplexityRoot.AuditEntry.TenantID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AuditEntry.TenantID(childComplexity), true
+	case "AuditEntry.toolName":
+		if e.ComplexityRoot.AuditEntry.ToolName == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AuditEntry.ToolName(childComplexity), true
 
 	case "CostSummary.eventCount":
 		if e.ComplexityRoot.CostSummary.EventCount == nil {
@@ -367,6 +437,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Agents(childComplexity), true
+	case "Query.auditEntries":
+		if e.ComplexityRoot.Query.AuditEntries == nil {
+			break
+		}
+
+		args, err := ec.field_Query_auditEntries_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.AuditEntries(childComplexity, args["limit"].(int)), true
 	case "Query.costs":
 		if e.ComplexityRoot.Query.Costs == nil {
 			break
@@ -378,6 +459,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Costs(childComplexity, args["from"].(time.Time), args["to"].(time.Time)), true
+
+	case "Subscription.auditEntryAdded":
+		if e.ComplexityRoot.Subscription.AuditEntryAdded == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Subscription.AuditEntryAdded(childComplexity), true
 
 	}
 	return 0, false
@@ -436,6 +524,23 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			ctx = graphql.WithLazyInputUnmarshalerIndex(ctx, inputUnmarshalers)
 			data := ec._Mutation(ctx, opCtx.Operation.SelectionSet)
 			var buf bytes.Buffer
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
+		}
+	case ast.Subscription:
+		next := ec._Subscription(ctx, opCtx.Operation.SelectionSet)
+
+		var buf bytes.Buffer
+		return func(ctx context.Context) *graphql.Response {
+			buf.Reset()
+			data := next(ctx)
+
+			if data == nil {
+				return nil
+			}
 			data.MarshalGQL(&buf)
 
 			return &graphql.Response{
@@ -513,6 +618,28 @@ func (ec *executionContext) childFields_Agent(ctx context.Context, field graphql
 		return ec.fieldContext_Agent_updatedAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Agent", field.Name)
+}
+
+func (ec *executionContext) childFields_AuditEntry(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_AuditEntry_id(ctx, field)
+	case "tenantId":
+		return ec.fieldContext_AuditEntry_tenantId(ctx, field)
+	case "sessionId":
+		return ec.fieldContext_AuditEntry_sessionId(ctx, field)
+	case "toolName":
+		return ec.fieldContext_AuditEntry_toolName(ctx, field)
+	case "decision":
+		return ec.fieldContext_AuditEntry_decision(ctx, field)
+	case "prevHash":
+		return ec.fieldContext_AuditEntry_prevHash(ctx, field)
+	case "rowHash":
+		return ec.fieldContext_AuditEntry_rowHash(ctx, field)
+	case "createdAt":
+		return ec.fieldContext_AuditEntry_createdAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type AuditEntry", field.Name)
 }
 
 func (ec *executionContext) childFields_CostSummary(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -780,6 +907,20 @@ func (ec *executionContext) field_Query_agent_args(ctx context.Context, rawArgs 
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_auditEntries_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "limit",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg0
 	return args, nil
 }
 
@@ -1130,6 +1271,190 @@ func (ec *executionContext) _Agent_updatedAt(ctx context.Context, field graphql.
 }
 func (ec *executionContext) fieldContext_Agent_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Agent", field, false, false, "Time")
+}
+
+func (ec *executionContext) _AuditEntry_id(ctx context.Context, field graphql.CollectedField, obj *model.AuditEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AuditEntry_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AuditEntry_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AuditEntry", field, false, false, "ID")
+}
+
+func (ec *executionContext) _AuditEntry_tenantId(ctx context.Context, field graphql.CollectedField, obj *model.AuditEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AuditEntry_tenantId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TenantID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AuditEntry_tenantId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AuditEntry", field, false, false, "ID")
+}
+
+func (ec *executionContext) _AuditEntry_sessionId(ctx context.Context, field graphql.CollectedField, obj *model.AuditEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AuditEntry_sessionId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SessionID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AuditEntry_sessionId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AuditEntry", field, false, false, "String")
+}
+
+func (ec *executionContext) _AuditEntry_toolName(ctx context.Context, field graphql.CollectedField, obj *model.AuditEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AuditEntry_toolName(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ToolName, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_AuditEntry_toolName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AuditEntry", field, false, false, "String")
+}
+
+func (ec *executionContext) _AuditEntry_decision(ctx context.Context, field graphql.CollectedField, obj *model.AuditEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AuditEntry_decision(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Decision, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AuditEntry_decision(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AuditEntry", field, false, false, "String")
+}
+
+func (ec *executionContext) _AuditEntry_prevHash(ctx context.Context, field graphql.CollectedField, obj *model.AuditEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AuditEntry_prevHash(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PrevHash, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AuditEntry_prevHash(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AuditEntry", field, false, false, "String")
+}
+
+func (ec *executionContext) _AuditEntry_rowHash(ctx context.Context, field graphql.CollectedField, obj *model.AuditEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AuditEntry_rowHash(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.RowHash, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AuditEntry_rowHash(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AuditEntry", field, false, false, "String")
+}
+
+func (ec *executionContext) _AuditEntry_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.AuditEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AuditEntry_createdAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AuditEntry_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AuditEntry", field, false, false, "Time")
 }
 
 func (ec *executionContext) _CostSummary_tenantId(ctx context.Context, field graphql.CollectedField, obj *model.CostSummary) (ret graphql.Marshaler) {
@@ -1817,6 +2142,50 @@ func (ec *executionContext) fieldContext_Query_costs(ctx context.Context, field 
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_auditEntries(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_auditEntries(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().AuditEntries(ctx, fc.Args["limit"].(int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.AuditEntry) graphql.Marshaler {
+			return ec.marshalNAuditEntry2ᚕᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐAuditEntryᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_auditEntries(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_AuditEntry(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_auditEntries_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1888,6 +2257,38 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields___Schema(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_auditEntryAdded(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Subscription_auditEntryAdded(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Subscription().AuditEntryAdded(ctx)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.AuditEntry) graphql.Marshaler {
+			return ec.marshalNAuditEntry2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐAuditEntry(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Subscription_auditEntryAdded(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_AuditEntry(ctx, field)
 		},
 	}
 	return fc, nil
@@ -3289,6 +3690,74 @@ func (ec *executionContext) _Agent(ctx context.Context, sel ast.SelectionSet, ob
 	return out
 }
 
+var auditEntryImplementors = []string{"AuditEntry"}
+
+func (ec *executionContext) _AuditEntry(ctx context.Context, sel ast.SelectionSet, obj *model.AuditEntry) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, auditEntryImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AuditEntry")
+		case "id":
+			out.Values[i] = ec._AuditEntry_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "tenantId":
+			out.Values[i] = ec._AuditEntry_tenantId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sessionId":
+			out.Values[i] = ec._AuditEntry_sessionId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "toolName":
+			out.Values[i] = ec._AuditEntry_toolName(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "decision":
+			out.Values[i] = ec._AuditEntry_decision(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "prevHash":
+			out.Values[i] = ec._AuditEntry_prevHash(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "rowHash":
+			out.Values[i] = ec._AuditEntry_rowHash(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._AuditEntry_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var costSummaryImplementors = []string{"CostSummary"}
 
 func (ec *executionContext) _CostSummary(ctx context.Context, sel ast.SelectionSet, obj *model.CostSummary) graphql.Marshaler {
@@ -3584,6 +4053,12 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				func(ctx context.Context) graphql.Marshaler {
 					return ec._Query_costs(ctx, field)
 				})
+		case "auditEntries":
+			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
+				true, true,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Query_auditEntries(ctx, field)
+				})
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -3613,6 +4088,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 	}
 
 	return out
+}
+
+var subscriptionImplementors = []string{"Subscription"}
+
+func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, subscriptionImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Subscription",
+	})
+	if len(fields) != 1 {
+		graphql.AddErrorf(ctx, "must subscribe to exactly one stream")
+		return nil
+	}
+
+	switch fields[0].Name {
+	case "auditEntryAdded":
+		return ec._Subscription_auditEntryAdded(ctx, fields[0])
+	default:
+		panic("unknown field " + strconv.Quote(fields[0].Name))
+	}
 }
 
 var __DirectiveImplementors = []string{"__Directive"}
@@ -4014,6 +4509,30 @@ func (ec *executionContext) marshalNAgentStatus2githubᚗcomᚋartsntechᚋchron
 		graphql.AddInvalidNullFromMarshaler(ctx, "AgentStatus!")
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNAuditEntry2ᚕᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐAuditEntryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.AuditEntry) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNAuditEntry2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐAuditEntry(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNAuditEntry2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐAuditEntry(ctx context.Context, sel ast.SelectionSet, v *model.AuditEntry) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "AuditEntry!")
+		return graphql.Null
+	}
+	return ec._AuditEntry(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {

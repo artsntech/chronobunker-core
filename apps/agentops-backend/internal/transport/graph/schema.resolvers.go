@@ -164,3 +164,85 @@ func (r *agentResolver) BreakerState(ctx context.Context, obj *agent.Agent) (str
 	}
 	return string(state), nil
 }
+
+func (r *queryResolver) AuditEntries(ctx context.Context, limit int) ([]*model.AuditEntry, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+
+	var entries []*model.AuditEntry
+	err := db.WithTenantTx(ctx, r.DB, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `
+			SELECT id, tenant_id, session_id, tool_name, decision,
+			       prev_hash, row_hash, created_at
+			FROM audit_entries
+			ORDER BY id ASC
+			LIMIT $1`, limit)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			e := &model.AuditEntry{}
+			var toolName sql.NullString
+			var createdAt time.Time
+			if err := rows.Scan(&e.ID, &e.TenantID, &e.SessionID, &toolName,
+				&e.Decision, &e.PrevHash, &e.RowHash, &createdAt); err != nil {
+				return err
+			}
+			if toolName.Valid {
+				e.ToolName = &toolName.String
+			}
+			e.CreatedAt = createdAt
+			entries = append(entries, e)
+		}
+		return rows.Err()
+	})
+	return entries, err
+}
+
+func (r *subscriptionResolver) AuditEntryAdded(ctx context.Context) (<-chan *model.AuditEntry, error) {
+	tenantID, err := db.TenantIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	hubCh := r.AuditHub.Subscribe(tenantID)
+	out := make(chan *model.AuditEntry, 16)
+
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case <-ctx.Done():
+				r.AuditHub.Unsubscribe(hubCh)
+				return
+			case entry, ok := <-hubCh:
+				if !ok {
+					return
+				}
+				var toolName *string
+				if entry.ToolName != "" {
+					toolName = &entry.ToolName
+				}
+				select {
+				case out <- &model.AuditEntry{
+					ID:        entry.ID,
+					TenantID:  entry.TenantID,
+					SessionID: entry.SessionID,
+					ToolName:  toolName,
+					Decision:  entry.Decision,
+					PrevHash:  entry.PrevHash,
+					RowHash:   entry.RowHash,
+					CreatedAt: entry.CreatedAt,
+				}:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+
+	return out, nil
+}

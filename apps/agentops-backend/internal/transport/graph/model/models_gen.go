@@ -8,6 +8,17 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
 )
 
+type AuditEntry struct {
+	ID        string    `json:"id"`
+	TenantID  string    `json:"tenantId"`
+	SessionID string    `json:"sessionId"`
+	ToolName  *string   `json:"toolName,omitempty"`
+	Decision  string    `json:"decision"`
+	PrevHash  string    `json:"prevHash"`
+	RowHash   string    `json:"rowHash"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
 type CostSummary struct {
 	TenantID   string    `json:"tenantId"`
 	TotalUsd   float64   `json:"totalUsd"`
@@ -59,6 +70,9 @@ type Mutation struct {
 }
 
 type Query struct {
+}
+
+type Subscription struct {
 }
 
 type UpdateAgentStatusInput struct {

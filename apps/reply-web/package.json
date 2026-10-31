@@ -12,6 +12,7 @@
   "dependencies": {
     "@apollo/client": "^4.3.5",
     "graphql": "^16.14.2",
+    "graphql-ws": "^6.4.1",
     "lucide-react": "^1.65.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -30,7 +31,7 @@
     "globals": "^17.13.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "typescript-eslint": "^8.72.0",
+    "typescript-eslint": "^8.72.1",
     "vite": "^8.3.5"
   }
 }

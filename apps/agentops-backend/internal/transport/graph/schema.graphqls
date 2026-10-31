@@ -90,3 +90,22 @@ type LoginResult {
 extend type Mutation {
   login(tenantId: ID!): LoginResult!
 }
+
+type AuditEntry {
+  id: ID!
+  tenantId: ID!
+  sessionId: String!
+  toolName: String
+  decision: String!
+  prevHash: String!
+  rowHash: String!
+  createdAt: Time!
+}
+
+extend type Subscription {
+  auditEntryAdded: AuditEntry!
+}
+
+extend type Query {
+  auditEntries(limit: Int!): [AuditEntry!]!
+}

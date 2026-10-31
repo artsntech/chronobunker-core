@@ -1,11 +1,11 @@
-import { ApolloClient, InMemoryCache, HttpLink, from } from '@apollo/client';
+import { ApolloClient, InMemoryCache, HttpLink, split } from '@apollo/client';
 import { SetContextLink } from '@apollo/client/link/context';
+import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
+import { getMainDefinition } from '@apollo/client/utilities';
+import { createClient } from 'graphql-ws';
 
-const httpLink = new HttpLink({
-  uri: 'http://localhost:8080/query',
-});
+const httpLink = new HttpLink({ uri: 'http://localhost:8080/query' });
 
-// v4: setter signature is (prevContext, operation)
 const authLink = new SetContextLink((prevContext, _operation) => {
   const token = localStorage.getItem('chrono_jwt');
   return {
@@ -17,7 +17,25 @@ const authLink = new SetContextLink((prevContext, _operation) => {
   };
 });
 
+const wsLink = new GraphQLWsLink(
+  createClient({
+    url: 'ws://localhost:8080/query',
+    connectionParams: () => ({
+      Authorization: `Bearer ${localStorage.getItem('chrono_jwt') || ''}`,
+    }),
+  })
+);
+
+const splitLink = split(
+  ({ query }) => {
+    const def = getMainDefinition(query);
+    return def.kind === 'OperationDefinition' && def.operation === 'subscription';
+  },
+  wsLink,
+  authLink.concat(httpLink)
+);
+
 export const client = new ApolloClient({
-  link: from([authLink, httpLink]),
+  link: splitLink,
   cache: new InMemoryCache(),
 });
