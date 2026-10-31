@@ -270,13 +270,13 @@ func main() {
 	}
 
 	go func() {
-		metricsMux := http.NewServeMux()
-		metricsMux.Handle("/metrics", promhttp.Handler())
-		log.Println("metrics listening on :9090")
-		if err := http.ListenAndServe(":9090", metricsMux); err != nil {
-			log.Printf("metrics server: %v", err)
-		}
-	}()
+    metricsMux := http.NewServeMux()
+    metricsMux.Handle("/metrics", middleware.CORS(promhttp.Handler()))
+    log.Println("metrics listening on :9090")
+    if err := http.ListenAndServe(":9090", metricsMux); err != nil {
+        log.Printf("metrics server: %v", err)
+    }
+}()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

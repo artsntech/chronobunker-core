@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import { gql } from '@apollo/client'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { Bot, Activity, Zap, ShieldAlert, LogOut } from 'lucide-react'
+import { RuntimePanel } from '../components/RuntimePanel'
+import { LatencyChart } from '../components/LatencyChart'
 
 const GET_AGENTS_AND_COSTS = gql`
   query GetAgentsAndCosts($from: Time!, $to: Time!) {
@@ -100,6 +102,7 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
   const [prompt, setPrompt] = useState('')
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
   const [sessionId] = useState(() => `web-session-${Date.now()}`)  // NEW
+  const [latencyHistory, setLatencyHistory] = useState<number[]>([])
   const [consoleLogs, setConsoleLogs] = useState<string[]>([
     '[SYSTEM] ChronoBunker node initialized. Active session secured.',
   ])
@@ -145,6 +148,7 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
       if (!invokeData?.invokeAgent) return
 
       const { completion, modelId, costUsd, latencyMs } = invokeData.invokeAgent
+      setLatencyHistory((prev) => [...prev.slice(-19), latencyMs])
       addLog(`[RESPONSE] Model: ${modelId} | Latency: ${latencyMs}ms | Cost: $${costUsd.toFixed(6)}`)
       addLog(`[AGENT] ${completion}`)
       setPrompt('')
@@ -258,7 +262,7 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
           </button>
         </div>
       </header>
-
+      <RuntimePanel />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -373,7 +377,16 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
 </div>
             </form>
           </div>
+          {latencyHistory.length > 0 && (
+  <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+      Router Latency (last 20 frames)
+    </h2>
+    <LatencyChart data={latencyHistory} />
+  </div>
+)}
         </div>
+        
 
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Live Audit Stream</h2>
