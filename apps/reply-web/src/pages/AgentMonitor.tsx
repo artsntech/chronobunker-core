@@ -42,6 +42,16 @@ const UPDATE_AGENT_STATUS = gql`
   }
 `
 
+const INVOKE_TOOL = gql`
+  mutation InvokeTool($input: InvokeToolInput!) {
+    invokeTool(input: $input) {
+      executed
+      cached
+      result
+    }
+  }
+`
+
 interface Agent {
   id: string
   name: string
@@ -78,9 +88,18 @@ interface AgentMonitorProps {
   onLogout: () => void
 }
 
+interface InvokeToolData {
+  invokeTool: {
+    executed: boolean
+    cached: boolean
+    result: Record<string, unknown>
+  }
+}
+
 export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
   const [prompt, setPrompt] = useState('')
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
+  const [sessionId] = useState(() => `web-session-${Date.now()}`)  // NEW
   const [consoleLogs, setConsoleLogs] = useState<string[]>([
     '[SYSTEM] ChronoBunker node initialized. Active session secured.',
   ])
@@ -100,6 +119,7 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
   })
 
   const [invokeAgent, { loading: promptLoading }] = useMutation(INVOKE_AGENT)
+  const [invokeTool, { loading: toolLoading }] = useMutation(INVOKE_TOOL)
   const [updateAgentStatus] = useMutation(UPDATE_AGENT_STATUS)
 
   const addLog = (msg: string) => {
@@ -133,6 +153,43 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
       addLog(`[ERROR] ${err.message}`)
     }
   }
+
+  const handleInvokeTool = async () => {
+  if (!activeAgentId) return
+
+  const deviceId = localStorage.getItem('chrono_device_id') || 'web-device-fallback'
+
+  addLog(`[TOOL] Invoking search_help_center via Ed25519 capability token...`)
+  addLog(`[TOOL] Session: ${sessionId} | Device: ${deviceId}`)
+
+  try {
+    const result = await invokeTool({
+      variables: {
+        input: {
+          agentId: activeAgentId,
+          sessionId,
+          deviceId,
+          toolName: 'search_help_center',
+          params: { query: 'how to track my order' },
+        },
+      },
+    })
+
+    const toolData = result.data as InvokeToolData | undefined
+    if (!toolData?.invokeTool) return
+
+    const { executed, cached, result: toolResult } = toolData.invokeTool
+    addLog(`[TOOL] Executed: ${executed} | Cached: ${cached}`)
+    addLog(`[TOOL] Result: ${JSON.stringify(toolResult)}`)
+
+    if (cached) {
+      addLog(`[TOOL] Idempotency cache hit — side effect was NOT re-executed.`)
+    }
+  } catch (err: any) {
+    addLog(`[TOOL ERROR] ${err.message}`)
+    addLog(`[TOOL] This is expected if the tool is not in the agent's allowedTools list.`)
+  }
+}
 
   const handleKillSwitch = async (agentId: string, currentStatus: string) => {
     const nextStatus = currentStatus === 'KILLED' ? 'PRODUCTION' : 'KILLED'
@@ -297,18 +354,23 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
                 }
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg p-4 font-mono text-xs text-slate-200 focus:outline-none focus:border-emerald-500 disabled:opacity-50 resize-none h-24"
               />
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] text-slate-500 font-mono">
-                  {activeAgentId ? `Target Context Locked: ${activeAgentId}` : 'No Context Bound'}
-                </span>
-                <button
-                  type="submit"
-                  disabled={!activeAgentId || !prompt || promptLoading}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-5 py-2 rounded-lg text-xs transition-colors flex items-center gap-2 disabled:opacity-50"
-                >
-                  {promptLoading ? 'Streaming Frame...' : 'Execute Completion'}
-                </button>
-              </div>
+              <div className="flex gap-2">
+  <button
+    type="button"
+    onClick={handleInvokeTool}
+    disabled={!activeAgentId || toolLoading}
+    className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-2 disabled:opacity-50"
+  >
+    {toolLoading ? 'Invoking Tool...' : '🛠️ Test Tool Gateway'}
+  </button>
+  <button
+    type="submit"
+    disabled={!activeAgentId || !prompt || promptLoading}
+    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-5 py-2 rounded-lg text-xs transition-colors flex items-center gap-2 disabled:opacity-50"
+  >
+    {promptLoading ? 'Streaming Frame...' : 'Execute Completion'}
+  </button>
+</div>
             </form>
           </div>
         </div>

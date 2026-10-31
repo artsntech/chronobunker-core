@@ -37,6 +37,7 @@ export const Login = ({ onLoginSuccess }: LoginProps) => {
       if (data?.login?.token) {
         localStorage.setItem('chrono_jwt', data.login.token)
         localStorage.setItem('chrono_tenant_id', data.login.tenantId)
+        localStorage.setItem('chrono_device_id', data.login.deviceId)  // NEW
         onLoginSuccess()
       }
     } catch (err) {
