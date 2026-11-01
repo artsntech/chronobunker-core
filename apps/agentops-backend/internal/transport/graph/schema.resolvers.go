@@ -80,7 +80,9 @@ func (r *mutationResolver) InvokeAgent(ctx context.Context, input model.InvokeAg
 	}
 
 	taskType := "triage"
-	if agentRecord.Department != "support" {
+	if agentRecord.Department == "chaos" {
+		taskType = "chaos"
+	} else if agentRecord.Department != "support" {
 		taskType = "reasoning"
 	}
 

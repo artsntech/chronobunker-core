@@ -108,6 +108,9 @@ func (r *Router) Route(ctx context.Context, taskType, prompt, sessionID string) 
 		if err != nil {
 			log.Printf("router: model %q not in registry: %v", modelID, err)
 			lastErr = err
+			if r.breaker != nil {
+				_ = r.breaker.RecordResult(ctx, breaker.TargetModel, modelID, false)
+			}
 			continue
 		}
 
