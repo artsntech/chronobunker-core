@@ -4,8 +4,9 @@ import { AgentMonitor } from './pages/AgentMonitor'
 import { AuditTrail } from './pages/AuditTrail'
 import { SecurityIntercept } from './pages/SecurityIntercept'
 import { BreakerLab } from './pages/BreakerLab'
+import { TenantIsolation } from './pages/TenantIsolation'
 
-type View = 'monitor' | 'audit' | 'intercept' | 'breaker'
+type View = 'monitor' | 'audit' | 'intercept' | 'breaker' | 'isolation'
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(
@@ -59,12 +60,21 @@ export default function App() {
         >
           Breaker Lab
         </button>
+        <button
+  onClick={() => setView('isolation')}
+  className={`px-3 py-1.5 rounded text-xs font-bold ${
+    view === 'isolation' ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-300'
+  }`}
+>
+  Tenant Isolation
+</button>
       </div>
 
       {view === 'monitor' && <AgentMonitor onLogout={handleLogout} />}
       {view === 'audit' && <AuditTrail />}
       {view === 'intercept' && <SecurityIntercept />}
       {view === 'breaker' && <BreakerLab />}
+      {view === 'isolation' && <TenantIsolation />}
     </div>
   )
 }
