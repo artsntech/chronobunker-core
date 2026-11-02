@@ -144,3 +144,12 @@ extend type Query {
   orders: [Order!]!
   order(id: ID!): Order
 }
+
+input CreateOrderInput {
+  product: String!
+  quantity: Int!
+}
+
+extend type Mutation {
+  createOrder(input: CreateOrderInput!): Order!
+}

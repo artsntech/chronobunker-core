@@ -81,3 +81,26 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*Order, error) {
 	}
 	return o, nil
 }
+
+// Create inserts a new order for the current tenant.
+func (r *Repository) Create(ctx context.Context, customerName, product string, quantity int, totalUSD float64) (*Order, error) {
+	tenantID, err := db.TenantIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var o *Order
+	err = db.WithTenantTx(ctx, r.db, func(tx *sql.Tx) error {
+		row := tx.QueryRowContext(ctx, `
+			INSERT INTO orders (tenant_id, customer_name, product, quantity, total_usd, status)
+			VALUES ($1, $2, $3, $4, $5, 'pending')
+			RETURNING id, tenant_id, customer_name, product, quantity, total_usd, status, created_at, updated_at`,
+			tenantID, customerName, product, quantity, totalUSD)
+		o = &Order{}
+		return row.Scan(&o.ID, &o.TenantID, &o.CustomerName, &o.Product,
+			&o.Quantity, &o.TotalUSD, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create order: %w", err)
+	}
+	return o, nil
+}

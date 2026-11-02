@@ -33,6 +33,11 @@ type CreateAgentInput struct {
 	TargetModel *string `json:"targetModel,omitempty"`
 }
 
+type CreateOrderInput struct {
+	Product  string `json:"product"`
+	Quantity int    `json:"quantity"`
+}
+
 type InvokeAgentInput struct {
 	AgentID   string `json:"agentId"`
 	Prompt    string `json:"prompt"`

@@ -319,3 +319,35 @@ func (r *queryResolver) Orders(ctx context.Context) ([]*order.Order, error) {
 func (r *queryResolver) Order(ctx context.Context, id string) (*order.Order, error) {
 	return r.OrderRepo.GetByID(ctx, id)
 }
+
+func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOrderInput) (*order.Order, error) {
+	// Product catalog with prices. In a real product, this would come from
+	// a database table, not a hardcoded map.
+	prices := map[string]float64{
+		"Bunker Starter Plan":    99.00,
+		"Bunker Pro Plan":        299.00,
+		"Bunker Enterprise Plan": 1299.00,
+		"Chrono Agent License":   149.00,
+	}
+	price, ok := prices[input.Product]
+	if !ok {
+		return nil, fmt.Errorf("unknown product: %s", input.Product)
+	}
+	if input.Quantity <= 0 {
+		return nil, fmt.Errorf("quantity must be positive")
+	}
+	total := price * float64(input.Quantity)
+
+	// Customer name derived from tenant. In production, it would be a JWT claim.
+	customerName := "Customer"
+	if tenantID, err := db.TenantIDFromContext(ctx); err == nil {
+		switch tenantID {
+		case "11111111-1111-1111-1111-111111111111":
+			customerName = "Acme Customer"
+		case "22222222-2222-2222-2222-222222222222":
+			customerName = "Globex Customer"
+		}
+	}
+
+	return r.OrderRepo.Create(ctx, customerName, input.Product, input.Quantity, total)
+}

@@ -95,6 +95,7 @@ type ComplexityRoot struct {
 
 	Mutation struct {
 		CreateAgent       func(childComplexity int, input model.CreateAgentInput) int
+		CreateOrder       func(childComplexity int, input model.CreateOrderInput) int
 		InvokeAgent       func(childComplexity int, input model.InvokeAgentInput) int
 		InvokeTool        func(childComplexity int, input model.InvokeToolInput) int
 		Login             func(childComplexity int, tenantID string) int
@@ -153,6 +154,7 @@ type MutationResolver interface {
 	InvokeTool(ctx context.Context, input model.InvokeToolInput) (*model.InvokeToolResult, error)
 	Login(ctx context.Context, tenantID string) (*model.LoginResult, error)
 	RunRedTeam(ctx context.Context) (bool, error)
+	CreateOrder(ctx context.Context, input model.CreateOrderInput) (*order.Order, error)
 }
 type QueryResolver interface {
 	Agents(ctx context.Context) ([]*agent.Agent, error)
@@ -406,6 +408,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateAgent(childComplexity, args["input"].(model.CreateAgentInput)), true
+	case "Mutation.createOrder":
+		if e.ComplexityRoot.Mutation.CreateOrder == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createOrder_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateOrder(childComplexity, args["input"].(model.CreateOrderInput)), true
 	case "Mutation.invokeAgent":
 		if e.ComplexityRoot.Mutation.InvokeAgent == nil {
 			break
@@ -636,6 +649,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	inputUnmarshalers := func() *graphql.InputUnmarshalerIndex {
 		return graphql.NewInputUnmarshalerIndex(
 			graphql.NewInputUnmarshaler("CreateAgentInput", ec.unmarshalInputCreateAgentInput),
+			graphql.NewInputUnmarshaler("CreateOrderInput", ec.unmarshalInputCreateOrderInput),
 			graphql.NewInputUnmarshaler("InvokeAgentInput", ec.unmarshalInputInvokeAgentInput),
 			graphql.NewInputUnmarshaler("InvokeToolInput", ec.unmarshalInputInvokeToolInput),
 			graphql.NewInputUnmarshaler("UpdateAgentStatusInput", ec.unmarshalInputUpdateAgentStatusInput),
@@ -1021,6 +1035,20 @@ func (ec *executionContext) field_Mutation_createAgent_args(ctx context.Context,
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.CreateAgentInput, error) {
 			return ec.unmarshalNCreateAgentInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐCreateAgentInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_createOrder_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateOrderInput, error) {
+			return ec.unmarshalNCreateOrderInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐCreateOrderInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -2260,6 +2288,50 @@ func (ec *executionContext) _Mutation_runRedTeam(ctx context.Context, field grap
 }
 func (ec *executionContext) fieldContext_Mutation_runRedTeam(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Mutation", field, true, true, "Boolean")
+}
+
+func (ec *executionContext) _Mutation_createOrder(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createOrder(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateOrder(ctx, fc.Args["input"].(model.CreateOrderInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *order.Order) graphql.Marshaler {
+			return ec.marshalNOrder2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋorderᚐOrder(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createOrder(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Order(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createOrder_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _Order_id(ctx context.Context, field graphql.CollectedField, obj *order.Order) (ret graphql.Marshaler) {
@@ -4139,6 +4211,55 @@ func UnmarshalCreateAgentInput(ctx context.Context, raw any) (model.CreateAgentI
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, obj any) (model.CreateOrderInput, error) {
+	var it model.CreateOrderInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"product", "quantity"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "product":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("product"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Product = data
+		case "quantity":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("quantity"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Quantity = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalCreateOrderInput unmarshals raw into the CreateOrderInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalCreateOrderInput(ctx context.Context, raw any) (model.CreateOrderInput, error) {
+	var out model.CreateOrderInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "CreateOrderInput", raw, &out)
+	return out, err
+}
+
 func (ec *executionContext) unmarshalInputInvokeAgentInput(ctx context.Context, obj any) (model.InvokeAgentInput, error) {
 	var it model.InvokeAgentInput
 	if obj == nil {
@@ -4718,6 +4839,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "runRedTeam":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_runRedTeam(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createOrder":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createOrder(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -5432,6 +5560,11 @@ func (ec *executionContext) marshalNCostSummary2ᚖgithubᚗcomᚋartsntechᚋch
 
 func (ec *executionContext) unmarshalNCreateAgentInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐCreateAgentInput(ctx context.Context, v any) (model.CreateAgentInput, error) {
 	res, err := ec.unmarshalInputCreateAgentInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNCreateOrderInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐCreateOrderInput(ctx context.Context, v any) (model.CreateOrderInput, error) {
+	res, err := ec.unmarshalInputCreateOrderInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
