@@ -127,3 +127,20 @@ extend type Subscription {
 extend type Mutation {
   runRedTeam: Boolean!
 }
+
+type Order {
+  id: ID!
+  tenantId: ID!
+  customerName: String!
+  product: String!
+  quantity: Int!
+  totalUsd: Float!
+  status: String!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+extend type Query {
+  orders: [Order!]!
+  order(id: ID!): Order
+}

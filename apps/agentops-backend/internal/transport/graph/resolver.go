@@ -9,6 +9,7 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/router"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/redteam"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/order"
 )
 
 // Resolver is the root dependency container for GraphQL resolvers.
@@ -23,6 +24,7 @@ type Resolver struct {
 	AuditHub     *audit.Hub
 	Classifier 	 *router.IntentClassifier
 	RedTeamHarness *redteam.Harness
+	OrderRepo 	*order.Repository
 }
 
 type queryResolver struct{ *Resolver }

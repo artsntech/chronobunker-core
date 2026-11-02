@@ -13,6 +13,7 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph/model"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/redteam"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/order"
 )
 
 // ── Query resolvers ──────────────────────────────────────────────
@@ -309,4 +310,12 @@ func (r *subscriptionResolver) RedTeamStream(ctx context.Context) (<-chan *model
 func (r *mutationResolver) RunRedTeam(ctx context.Context) (bool, error) {
 	go r.RedTeamHarness.RunAll(context.Background())
 	return true, nil
+}
+
+func (r *queryResolver) Orders(ctx context.Context) ([]*order.Order, error) {
+	return r.OrderRepo.List(ctx)
+}
+
+func (r *queryResolver) Order(ctx context.Context, id string) (*order.Order, error) {
+	return r.OrderRepo.GetByID(ctx, id)
 }

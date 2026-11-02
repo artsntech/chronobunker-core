@@ -19,6 +19,7 @@ model:
 
 autobind:
   - github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent
+  - github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/order
 
 models:
   Agent:
@@ -32,6 +33,19 @@ models:
         fieldName: AllowedTools
       targetModel:
         fieldName: TargetModel
+      createdAt:
+        fieldName: CreatedAt
+      updatedAt:
+        fieldName: UpdatedAt
+  Order:
+    model: github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/order.Order
+    fields:
+      tenantId:
+        fieldName: TenantID
+      customerName:
+        fieldName: CustomerName
+      totalUsd:
+        fieldName: TotalUSD
       createdAt:
         fieldName: CreatedAt
       updatedAt:

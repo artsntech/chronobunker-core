@@ -35,6 +35,7 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/middleware"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/redteam"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/order"
 )
 
 func main() {
@@ -184,6 +185,7 @@ redTeamHarness := redteam.NewHarness("http://localhost:8080/query", harnessToken
 			AuditHub:     auditHub,
 			Classifier:   classifier,
 			RedTeamHarness: redTeamHarness,
+			OrderRepo: order.NewRepository(database),
 		},
 	})
 
@@ -209,9 +211,7 @@ redTeamHarness := redteam.NewHarness("http://localhost:8080/query", harnessToken
 		},
 		Implementation: transport.CoderWebsocketImplementation{
 			AcceptOptions: coderws.AcceptOptions{
-				// OriginPatterns is mandatory: without it, any origin can
-				// open an authenticated WebSocket (CSWSH).
-				OriginPatterns: []string{"localhost:5173"},
+				OriginPatterns: middleware.AllowedOrigins(),
 				Subprotocols:   []string{"graphql-transport-ws", "graphql-ws"},
 			},
 		},
