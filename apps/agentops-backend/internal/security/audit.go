@@ -119,3 +119,45 @@ func (a *AuditLog) Reject(ctx context.Context, req ToolRequest, reason string) {
 		return err
 	})
 }
+
+// RecordAction records a non-tool action (e.g., order creation) in the
+// audit trail. It is used when the action does not go through the Tool
+// Gateway and therefore has no capability token.
+func (a *AuditLog) RecordAction(ctx context.Context, sessionID, action string, params any, result any, decision string) error {
+	tenantID, err := db.TenantIDFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	paramsJSON, _ := json.Marshal(params)
+	resultJSON, _ := json.Marshal(result)
+
+	var prevHash string
+	_ = db.WithTenantTx(ctx, a.db, func(tx *sql.Tx) error {
+		err := tx.QueryRowContext(ctx, `
+			SELECT row_hash FROM audit_entries ORDER BY id DESC LIMIT 1`).Scan(&prevHash)
+		if err == sql.ErrNoRows {
+			prevHash = "0000000000000000000000000000000000000000000000000000000000000000"
+			return nil
+		}
+		return err
+	})
+
+	h := sha256.New()
+	h.Write([]byte(prevHash))
+	h.Write([]byte(tenantID))
+	h.Write([]byte(sessionID))
+	h.Write([]byte(action))
+	h.Write(paramsJSON)
+	h.Write(resultJSON)
+	h.Write([]byte(decision))
+	rowHash := hex.EncodeToString(h.Sum(nil))
+
+	return db.WithTenantTx(ctx, a.db, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `
+			INSERT INTO audit_entries (tenant_id, session_id, tool_name, params, result, decision, prev_hash, row_hash)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			tenantID, sessionID, action, paramsJSON, resultJSON, decision, prevHash, rowHash)
+		return err
+	})
+}

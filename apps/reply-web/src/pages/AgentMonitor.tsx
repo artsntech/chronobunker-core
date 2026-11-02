@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { gql } from '@apollo/client'
-import { useQuery, useMutation } from '@apollo/client/react'
+import { useQuery, useMutation, useSubscription } from '@apollo/client/react'
 import { Bot, Activity, Zap, ShieldAlert, LogOut } from 'lucide-react'
 import { RuntimePanel } from '../components/RuntimePanel'
 import { LatencyChart } from '../components/LatencyChart'
@@ -45,6 +45,21 @@ const UPDATE_AGENT_STATUS = gql`
   }
 `
 
+const AUDIT_ENTRY_ADDED = gql`
+  subscription AuditEntryAdded {
+    auditEntryAdded {
+      id
+      tenantId
+      sessionId
+      toolName
+      decision
+      prevHash
+      rowHash
+      createdAt
+    }
+  }
+`
+
 interface Agent {
   id: string
   name: string
@@ -77,6 +92,21 @@ interface InvokeAgentData {
   invokeAgent: InvokeAgentResult
 }
 
+interface AuditEntry {
+  id: string
+  tenantId: string
+  sessionId: string
+  toolName: string | null
+  decision: string
+  prevHash: string
+  rowHash: string
+  createdAt: string
+}
+
+interface AuditSubscriptionData {
+  auditEntryAdded: AuditEntry
+}
+
 interface AgentMonitorProps {
   onLogout: () => void
 }
@@ -84,11 +114,12 @@ interface AgentMonitorProps {
 export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
   const [latencyHistory, setLatencyHistory] = useState<number[]>([])
+  const [liveAudit, setLiveAudit] = useState<AuditEntry[]>([])
   const [consoleLogs, setConsoleLogs] = useState<string[]>([
     '[SYSTEM] ChronoBunker node initialized. Active session secured.',
   ])
 
-    const variables = useMemo(() => {
+  const variables = useMemo(() => {
     const now = new Date()
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
     return {
@@ -104,6 +135,14 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
 
   const [invokeAgent, { loading: promptLoading }] = useMutation(INVOKE_AGENT)
   const [updateAgentStatus] = useMutation(UPDATE_AGENT_STATUS)
+
+  useSubscription(AUDIT_ENTRY_ADDED, {
+    onData: ({ data: subData }) => {
+      const typed = subData.data as AuditSubscriptionData | undefined
+      if (!typed?.auditEntryAdded) return
+      setLiveAudit((prev) => [typed.auditEntryAdded, ...prev.slice(0, 49)])
+    },
+  })
 
   const addLog = (msg: string) => {
     setConsoleLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 50)])
@@ -144,7 +183,7 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
   const typedData = data as AgentsAndCostsData | undefined
   const agents = typedData?.agents || []
   const costSummary = typedData?.costs
-  const activeAgent = agents.find(a => a.id === activeAgentId)
+  const activeAgent = agents.find((a) => a.id === activeAgentId)
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
@@ -177,8 +216,10 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
           </button>
         </div>
       </header>
+
       <RuntimePanel />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <div className="lg:col-span-2 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {agents.map((agent) => (
@@ -262,68 +303,109 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
               Model Router Terminal Endpoint
             </h2>
             <DirectiveConsole
-  onExecute={async (prompt) => {
-    if (!activeAgentId) return
-    addLog(`Invoking agent {${activeAgentId}} with prompt: "${prompt}"...`)
-    try {
-      const result = await invokeAgent({
-        variables: {
-          input: {
-            agentId: activeAgentId,
-            prompt,
-            sessionId: `web-session-${Date.now()}`,
-          },
-        },
-      })
-      const invokeData = result.data as InvokeAgentData | undefined
-      if (!invokeData?.invokeAgent) return
-      const { completion, modelId, costUsd, latencyMs } = invokeData.invokeAgent
-      setLatencyHistory((prev) => [...prev.slice(-19), latencyMs])
-      addLog(`[RESPONSE] Model: ${modelId} | Latency: ${latencyMs}ms | Cost: $${costUsd.toFixed(6)}`)
-      addLog(`[AGENT] ${completion}`)
-      refetch()
-    } catch (err: any) {
-      addLog(`[ERROR] ${err.message}`)
-      throw err // propaga para o DirectiveConsole mostrar
-    }
-  }}
-  disabled={!activeAgentId}
-  loading={promptLoading}
-  domain={activeAgent?.department === 'support'
-    ? 'Order tracking, proofs, file formats (CMYK, DPI, bleed), refunds, delivery'
-    : 'Chaos testing and failure injection'}
-/>
+              onExecute={async (prompt) => {
+                if (!activeAgentId) return
+                addLog(`Invoking agent {${activeAgentId}} with prompt: "${prompt}"...`)
+                try {
+                  const result = await invokeAgent({
+                    variables: {
+                      input: {
+                        agentId: activeAgentId,
+                        prompt,
+                        sessionId: `web-session-${Date.now()}`,
+                      },
+                    },
+                  })
+                  const invokeData = result.data as InvokeAgentData | undefined
+                  if (!invokeData?.invokeAgent) return
+                  const { completion, modelId, costUsd, latencyMs } = invokeData.invokeAgent
+                  setLatencyHistory((prev) => [...prev.slice(-19), latencyMs])
+                  addLog(`[RESPONSE] Model: ${modelId} | Latency: ${latencyMs}ms | Cost: $${costUsd.toFixed(6)}`)
+                  addLog(`[AGENT] ${completion}`)
+                  refetch()
+                } catch (err: any) {
+                  addLog(`[ERROR] ${err.message}`)
+                  throw err
+                }
+              }}
+              disabled={!activeAgentId}
+              loading={promptLoading}
+              domain={activeAgent?.department === 'support'
+                ? 'Order tracking, proofs, file formats (CMYK, DPI, bleed), refunds, delivery'
+                : 'Chaos testing and failure injection'}
+            />
           </div>
-          {latencyHistory.length > 0 && (
-  <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-      Router Latency (last 20 frames)
-    </h2>
-    <LatencyChart data={latencyHistory} />
-  </div>
-)}
-        </div>
-        
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Live Audit Stream</h2>
-          <div className="h-[500px] bg-slate-950 border border-slate-800 rounded p-2 overflow-y-auto space-y-1 text-[11px] font-mono">
-            {consoleLogs.map((log, index) => (
-              <div
-                key={index}
-                className={`p-1.5 rounded border border-slate-800/40 ${
-                  log.includes('[ERROR]') || log.includes('[KILL')
-                    ? 'bg-red-950/20 text-red-400 border-red-900/30'
-                    : log.includes('[RESPONSE]')
-                    ? 'bg-teal-950/20 text-teal-400 border-teal-900/30'
-                    : log.includes('[AGENT]')
-                    ? 'bg-slate-950 text-slate-100 border-slate-800'
-                    : 'bg-slate-950/40 text-slate-400'
-                }`}
-              >
-                {log}
+          {latencyHistory.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+                Router Latency (last 20 frames)
+              </h2>
+              <LatencyChart data={latencyHistory} />
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">
+              Live Audit Stream
+            </h2>
+            {liveAudit.length === 0 ? (
+              <div className="h-[400px] bg-slate-950 border border-slate-800 rounded p-2 flex items-center justify-center text-[11px] font-mono text-slate-600">
+                Waiting for audit events...
               </div>
-            ))}
+            ) : (
+              <div className="h-[400px] bg-slate-950 border border-slate-800 rounded p-2 overflow-y-auto space-y-1 text-[11px] font-mono">
+                {liveAudit.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className={`p-1.5 rounded border ${
+                      entry.decision === 'blocked'
+                        ? 'bg-red-950/20 text-red-400 border-red-900/30'
+                        : entry.decision === 'allowed'
+                        ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900/30'
+                        : 'bg-slate-950/40 text-slate-400 border-slate-800/40'
+                    }`}
+                  >
+                    <div className="flex justify-between mb-1">
+                      <span className="text-slate-500">#{entry.id}</span>
+                      <span className={entry.decision === 'blocked' ? 'text-red-400 font-bold' : 'text-emerald-400 font-bold'}>
+                        {entry.decision.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      tool: {entry.toolName || 'system'}
+                    </div>
+                    <div className="text-[9px] text-slate-600 font-mono">
+                      row_hash: {entry.rowHash.slice(0, 16)}...
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Console</h2>
+            <div className="h-[300px] bg-slate-950 border border-slate-800 rounded p-2 overflow-y-auto space-y-1 text-[10px] font-mono">
+              {consoleLogs.map((log, index) => (
+                <div
+                  key={index}
+                  className={`p-1.5 rounded border border-slate-800/40 ${
+                    log.includes('[ERROR]') || log.includes('[KILL')
+                      ? 'bg-red-950/20 text-red-400 border-red-900/30'
+                      : log.includes('[RESPONSE]')
+                      ? 'bg-teal-950/20 text-teal-400 border-teal-900/30'
+                      : log.includes('[AGENT]')
+                      ? 'bg-slate-950 text-slate-100 border-slate-800'
+                      : 'bg-slate-950/40 text-slate-400'
+                  }`}
+                >
+                  {log}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
 )
 
 // Order is a customer purchase from the Bunker Store.
@@ -26,12 +27,13 @@ type Order struct {
 // Repository provides CRUD operations for orders. All methods require a
 // context carrying a tenant ID and must be called inside db.WithTenantTx.
 type Repository struct {
-	db *sql.DB
+	db    *sql.DB
+	audit *security.AuditLog
 }
 
 // NewRepository constructs a Repository.
-func NewRepository(db *sql.DB) *Repository {
-	return &Repository{db: db}
+func NewRepository(db *sql.DB, audit *security.AuditLog) *Repository {
+	return &Repository{db: db, audit: audit}
 }
 
 // List returns all orders visible to the current tenant.
@@ -82,7 +84,8 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*Order, error) {
 	return o, nil
 }
 
-// Create inserts a new order for the current tenant.
+// Create inserts a new order for the current tenant and records it in the
+// audit trail.
 func (r *Repository) Create(ctx context.Context, customerName, product string, quantity int, totalUSD float64) (*Order, error) {
 	tenantID, err := db.TenantIDFromContext(ctx)
 	if err != nil {
@@ -102,5 +105,15 @@ func (r *Repository) Create(ctx context.Context, customerName, product string, q
 	if err != nil {
 		return nil, fmt.Errorf("create order: %w", err)
 	}
+
+	// Audit the action. This is what the cockpit sees.
+_ = r.audit.RecordAction(ctx, "store-session", "create_order", map[string]any{
+	"order_id":  o.ID,
+	"product":   o.Product,
+	"quantity":  o.Quantity,
+	"total_usd": o.TotalUSD,
+	"status":    o.Status,
+}, o, "allowed")
+
 	return o, nil
 }

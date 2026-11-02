@@ -173,6 +173,8 @@ if err != nil {
 }
 redTeamHarness := redteam.NewHarness("http://localhost:8080/query", harnessToken)
 
+auditLog := security.NewAuditLog(database)
+
 	es := graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{
 			AgentRepo:    agent.NewRepository(database),
@@ -185,7 +187,7 @@ redTeamHarness := redteam.NewHarness("http://localhost:8080/query", harnessToken
 			AuditHub:     auditHub,
 			Classifier:   classifier,
 			RedTeamHarness: redTeamHarness,
-			OrderRepo: order.NewRepository(database),
+			OrderRepo: order.NewRepository(database, auditLog),
 		},
 	})
 
