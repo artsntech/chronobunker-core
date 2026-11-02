@@ -1,18 +1,70 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { gql } from '@apollo/client'
+import { useQuery } from '@apollo/client/react'
+import { Cockpit, type CockpitView } from './lib/cockpit'
+import type { Alert } from './components/AttentionBar'
 import { Login } from './pages/Login'
 import { AgentMonitor } from './pages/AgentMonitor'
-import { AuditTrail } from './pages/AuditTrail'
 import { SecurityIntercept } from './pages/SecurityIntercept'
 import { BreakerLab } from './pages/BreakerLab'
 import { TenantIsolation } from './pages/TenantIsolation'
+import { AuditTrail } from './pages/AuditTrail'
 
-type View = 'monitor' | 'audit' | 'intercept' | 'breaker' | 'isolation'
+const GET_BREAKER_STATES = gql`
+  query GetBreakerStates {
+    agents {
+      id
+      name
+      breakerState
+    }
+  }
+`
+
+interface BreakerData {
+  agents: { id: string; name: string; breakerState: string }[]
+}
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(
     () => !!localStorage.getItem('chrono_jwt')
   )
-  const [view, setView] = useState<View>('monitor')
+  const [view, setView] = useState<CockpitView>('monitor')
+
+  const { data } = useQuery<BreakerData>(GET_BREAKER_STATES, {
+    skip: !isAuthenticated,
+    pollInterval: 5000,
+  })
+
+  const { threatLevel, alerts } = useMemo(() => {
+    const agents = data?.agents || []
+    const alertsList: Alert[] = []
+    let level: 'NOMINAL' | 'ELEVATED' | 'CRITICAL' = 'NOMINAL'
+
+    const openAgents = agents.filter((a) => a.breakerState === 'open')
+    const halfOpenAgents = agents.filter((a) => a.breakerState === 'half_open')
+
+    if (openAgents.length > 0) {
+      level = 'CRITICAL'
+      openAgents.forEach((a) => {
+        alertsList.push({
+          type: 'breaker',
+          message: `BREAKER OPEN: ${a.name}`,
+          view: 'breaker',
+        })
+      })
+    } else if (halfOpenAgents.length > 0) {
+      level = 'ELEVATED'
+      halfOpenAgents.forEach((a) => {
+        alertsList.push({
+          type: 'breaker',
+          message: `BREAKER HALF_OPEN: ${a.name} recovering`,
+          view: 'breaker',
+        })
+      })
+    }
+
+    return { threatLevel: level, alerts: alertsList }
+  }, [data])
 
   const handleLogout = () => {
     localStorage.removeItem('chrono_jwt')
@@ -26,55 +78,18 @@ export default function App() {
   }
 
   return (
-    <div>
-      <div className="fixed bottom-4 right-4 z-50 flex gap-2">
-        <button
-          onClick={() => setView('monitor')}
-          className={`px-3 py-1.5 rounded text-xs font-bold ${
-            view === 'monitor' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-300'
-          }`}
-        >
-          Monitor
-        </button>
-        <button
-          onClick={() => setView('audit')}
-          className={`px-3 py-1.5 rounded text-xs font-bold ${
-            view === 'audit' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300'
-          }`}
-        >
-          Audit Trail
-        </button>
-        <button
-          onClick={() => setView('intercept')}
-          className={`px-3 py-1.5 rounded text-xs font-bold ${
-            view === 'intercept' ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-300'
-          }`}
-        >
-          Security Intercept
-        </button>
-        <button
-          onClick={() => setView('breaker')}
-          className={`px-3 py-1.5 rounded text-xs font-bold ${
-            view === 'breaker' ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-300'
-          }`}
-        >
-          Breaker Lab
-        </button>
-        <button
-  onClick={() => setView('isolation')}
-  className={`px-3 py-1.5 rounded text-xs font-bold ${
-    view === 'isolation' ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-300'
-  }`}
->
-  Tenant Isolation
-</button>
-      </div>
-
+    <Cockpit
+      view={view}
+      onNavigate={setView}
+      onLogout={handleLogout}
+      threatLevel={threatLevel}
+      alerts={alerts}
+    >
       {view === 'monitor' && <AgentMonitor onLogout={handleLogout} />}
-      {view === 'audit' && <AuditTrail />}
       {view === 'intercept' && <SecurityIntercept />}
       {view === 'breaker' && <BreakerLab />}
       {view === 'isolation' && <TenantIsolation />}
-    </div>
+      {view === 'audit' && <AuditTrail />}
+    </Cockpit>
   )
 }

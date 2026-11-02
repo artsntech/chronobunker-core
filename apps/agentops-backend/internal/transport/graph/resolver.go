@@ -20,6 +20,7 @@ type Resolver struct {
 	Breaker      *breaker.Breaker
 	JWTIssuer    *security.JWTIssuer
 	AuditHub     *audit.Hub
+	Classifier 	 *router.IntentClassifier
 }
 
 type queryResolver struct{ *Resolver }

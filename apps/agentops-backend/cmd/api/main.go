@@ -129,6 +129,11 @@ func main() {
 	}
 	sanitizer := security.NewOutputSanitizer(canary)
 
+	classifier, err := router.NewIntentClassifier()
+if err != nil {
+	log.Fatalf("init classifier: %v", err)
+}
+
 	modelRouter, err := router.NewRouter(database, groqProvider, breakerInstance, sanitizer, policyPath)
 	if err != nil {
 		log.Fatalf("init router: %v", err)
@@ -169,6 +174,7 @@ func main() {
 			Breaker:      breakerInstance,
 			JWTIssuer:    jwtIssuer,
 			AuditHub:     auditHub,
+			Classifier:   classifier,
 		},
 	})
 

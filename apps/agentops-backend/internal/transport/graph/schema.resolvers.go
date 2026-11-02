@@ -79,6 +79,21 @@ func (r *mutationResolver) InvokeAgent(ctx context.Context, input model.InvokeAg
 		return nil, fmt.Errorf("load agent: %w", err)
 	}
 
+	// Domain validation: the agent only handles its declared scope.
+	// This is the second layer of defense (the frontend is the first).
+	if r.Classifier != nil {
+		domain := domainForDepartment(agentRecord.Department)
+		result, err := r.Classifier.Classify(ctx, input.Prompt, domain)
+		if err != nil {
+			// Fail closed: if the classifier is down, reject rather than
+			// letting an unvalidated prompt through.
+			return nil, fmt.Errorf("intent classification unavailable: %w", err)
+		}
+		if !result.Allowed {
+			return nil, fmt.Errorf("out of scope: %s", result.Reason)
+		}
+	}
+
 	taskType := "triage"
 	if agentRecord.Department == "chaos" {
 		taskType = "chaos"
@@ -247,4 +262,15 @@ func (r *subscriptionResolver) AuditEntryAdded(ctx context.Context) (<-chan *mod
 	}()
 
 	return out, nil
+}
+
+func domainForDepartment(dept string) string {
+	switch dept {
+	case "support":
+		return `Order tracking, proof approval, file format questions (CMYK, DPI, bleed), refund requests, delivery estimates, product specifications.`
+	case "chaos":
+		return `Chaos testing and failure injection for infrastructure resilience.`
+	default:
+		return `General order-related customer support.`
+	}
 }

@@ -4,6 +4,7 @@ import { useQuery, useMutation } from '@apollo/client/react'
 import { Bot, Activity, Zap, ShieldAlert, LogOut } from 'lucide-react'
 import { RuntimePanel } from '../components/RuntimePanel'
 import { LatencyChart } from '../components/LatencyChart'
+import { DirectiveConsole } from '../components/DirectiveConsole'
 
 const GET_AGENTS_AND_COSTS = gql`
   query GetAgentsAndCosts($from: Time!, $to: Time!) {
@@ -44,16 +45,6 @@ const UPDATE_AGENT_STATUS = gql`
   }
 `
 
-const INVOKE_TOOL = gql`
-  mutation InvokeTool($input: InvokeToolInput!) {
-    invokeTool(input: $input) {
-      executed
-      cached
-      result
-    }
-  }
-`
-
 interface Agent {
   id: string
   name: string
@@ -90,18 +81,8 @@ interface AgentMonitorProps {
   onLogout: () => void
 }
 
-interface InvokeToolData {
-  invokeTool: {
-    executed: boolean
-    cached: boolean
-    result: Record<string, unknown>
-  }
-}
-
 export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
-  const [prompt, setPrompt] = useState('')
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
-  const [sessionId] = useState(() => `web-session-${Date.now()}`)  // NEW
   const [latencyHistory, setLatencyHistory] = useState<number[]>([])
   const [consoleLogs, setConsoleLogs] = useState<string[]>([
     '[SYSTEM] ChronoBunker node initialized. Active session secured.',
@@ -122,78 +103,11 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
   })
 
   const [invokeAgent, { loading: promptLoading }] = useMutation(INVOKE_AGENT)
-  const [invokeTool, { loading: toolLoading }] = useMutation(INVOKE_TOOL)
   const [updateAgentStatus] = useMutation(UPDATE_AGENT_STATUS)
 
   const addLog = (msg: string) => {
     setConsoleLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 50)])
   }
-
-  const handleInvoke = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!prompt || !activeAgentId) return
-
-    addLog(`Invoking agent {${activeAgentId}} with prompt: "${prompt}"...`)
-    try {
-      const result = await invokeAgent({
-        variables: {
-          input: {
-            agentId: activeAgentId,
-            prompt: prompt,
-            sessionId: `web-session-${Date.now()}`,
-          },
-        },
-      })
-      const invokeData = result.data as InvokeAgentData | undefined
-      if (!invokeData?.invokeAgent) return
-
-      const { completion, modelId, costUsd, latencyMs } = invokeData.invokeAgent
-      setLatencyHistory((prev) => [...prev.slice(-19), latencyMs])
-      addLog(`[RESPONSE] Model: ${modelId} | Latency: ${latencyMs}ms | Cost: $${costUsd.toFixed(6)}`)
-      addLog(`[AGENT] ${completion}`)
-      setPrompt('')
-      refetch()
-    } catch (err: any) {
-      addLog(`[ERROR] ${err.message}`)
-    }
-  }
-
-  const handleInvokeTool = async () => {
-  if (!activeAgentId) return
-
-  const deviceId = localStorage.getItem('chrono_device_id') || 'web-device-fallback'
-
-  addLog(`[TOOL] Invoking search_help_center via Ed25519 capability token...`)
-  addLog(`[TOOL] Session: ${sessionId} | Device: ${deviceId}`)
-
-  try {
-    const result = await invokeTool({
-      variables: {
-        input: {
-          agentId: activeAgentId,
-          sessionId,
-          deviceId,
-          toolName: 'search_help_center',
-          params: { query: 'how to track my order' },
-        },
-      },
-    })
-
-    const toolData = result.data as InvokeToolData | undefined
-    if (!toolData?.invokeTool) return
-
-    const { executed, cached, result: toolResult } = toolData.invokeTool
-    addLog(`[TOOL] Executed: ${executed} | Cached: ${cached}`)
-    addLog(`[TOOL] Result: ${JSON.stringify(toolResult)}`)
-
-    if (cached) {
-      addLog(`[TOOL] Idempotency cache hit — side effect was NOT re-executed.`)
-    }
-  } catch (err: any) {
-    addLog(`[TOOL ERROR] ${err.message}`)
-    addLog(`[TOOL] This is expected if the tool is not in the agent's allowedTools list.`)
-  }
-}
 
   const handleKillSwitch = async (agentId: string, currentStatus: string) => {
     const nextStatus = currentStatus === 'KILLED' ? 'PRODUCTION' : 'KILLED'
@@ -230,6 +144,7 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
   const typedData = data as AgentsAndCostsData | undefined
   const agents = typedData?.agents || []
   const costSummary = typedData?.costs
+  const activeAgent = agents.find(a => a.id === activeAgentId)
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
@@ -346,36 +261,38 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
               <Zap className="text-amber-400 w-4 h-4" />
               Model Router Terminal Endpoint
             </h2>
-            <form onSubmit={handleInvoke} className="space-y-4">
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                disabled={!activeAgentId || promptLoading}
-                placeholder={
-                  activeAgentId
-                    ? 'Enter the directive for Groq Router processing...'
-                    : 'Select an active Agent above to arm the route...'
-                }
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-4 font-mono text-xs text-slate-200 focus:outline-none focus:border-emerald-500 disabled:opacity-50 resize-none h-24"
-              />
-              <div className="flex gap-2">
-  <button
-    type="button"
-    onClick={handleInvokeTool}
-    disabled={!activeAgentId || toolLoading}
-    className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-2 disabled:opacity-50"
-  >
-    {toolLoading ? 'Invoking Tool...' : '🛠️ Test Tool Gateway'}
-  </button>
-  <button
-    type="submit"
-    disabled={!activeAgentId || !prompt || promptLoading}
-    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-5 py-2 rounded-lg text-xs transition-colors flex items-center gap-2 disabled:opacity-50"
-  >
-    {promptLoading ? 'Streaming Frame...' : 'Execute Completion'}
-  </button>
-</div>
-            </form>
+            <DirectiveConsole
+  onExecute={async (prompt) => {
+    if (!activeAgentId) return
+    addLog(`Invoking agent {${activeAgentId}} with prompt: "${prompt}"...`)
+    try {
+      const result = await invokeAgent({
+        variables: {
+          input: {
+            agentId: activeAgentId,
+            prompt,
+            sessionId: `web-session-${Date.now()}`,
+          },
+        },
+      })
+      const invokeData = result.data as InvokeAgentData | undefined
+      if (!invokeData?.invokeAgent) return
+      const { completion, modelId, costUsd, latencyMs } = invokeData.invokeAgent
+      setLatencyHistory((prev) => [...prev.slice(-19), latencyMs])
+      addLog(`[RESPONSE] Model: ${modelId} | Latency: ${latencyMs}ms | Cost: $${costUsd.toFixed(6)}`)
+      addLog(`[AGENT] ${completion}`)
+      refetch()
+    } catch (err: any) {
+      addLog(`[ERROR] ${err.message}`)
+      throw err // propaga para o DirectiveConsole mostrar
+    }
+  }}
+  disabled={!activeAgentId}
+  loading={promptLoading}
+  domain={activeAgent?.department === 'support'
+    ? 'Order tracking, proofs, file formats (CMYK, DPI, bleed), refunds, delivery'
+    : 'Chaos testing and failure injection'}
+/>
           </div>
           {latencyHistory.length > 0 && (
   <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
