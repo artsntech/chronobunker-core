@@ -12,6 +12,7 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph/model"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/redteam"
 )
 
 // ── Query resolvers ──────────────────────────────────────────────
@@ -273,4 +274,39 @@ func domainForDepartment(dept string) string {
 	default:
 		return `General order-related customer support.`
 	}
+}
+
+func (r *subscriptionResolver) RedTeamStream(ctx context.Context) (<-chan *model.RedTeamResult, error) {
+	ch := make(chan *redteam.ScenarioResult, 16)
+	r.RedTeamHarness.Subscribe(ch)
+	out := make(chan *model.RedTeamResult, 16)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case <-ctx.Done():
+				r.RedTeamHarness.Unsubscribe(ch)
+				return
+			case r, ok := <-ch:
+				if !ok {
+					return
+				}
+				out <- &model.RedTeamResult{
+					ID:            r.ID,
+					Name:          r.Name,
+					OwaspCategory: r.OWASPCategory,
+					Status:        r.Status,
+					Detail:        r.Detail,
+					DurationMs:    r.DurationMs,
+					RanAt:         r.RanAt,
+				}
+			}
+		}
+	}()
+	return out, nil
+}
+
+func (r *mutationResolver) RunRedTeam(ctx context.Context) (bool, error) {
+	go r.RedTeamHarness.RunAll(context.Background())
+	return true, nil
 }

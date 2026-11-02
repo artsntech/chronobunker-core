@@ -109,3 +109,21 @@ extend type Subscription {
 extend type Query {
   auditEntries(limit: Int!): [AuditEntry!]!
 }
+
+type RedTeamResult {
+  id: ID!
+  name: String!
+  owaspCategory: String!
+  status: String!
+  detail: String!
+  durationMs: Int!
+  ranAt: Time!
+}
+
+extend type Subscription {
+  redTeamStream: RedTeamResult!
+}
+
+extend type Mutation {
+  runRedTeam: Boolean!
+}

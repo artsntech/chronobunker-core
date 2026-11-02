@@ -34,6 +34,7 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/middleware"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/redteam"
 )
 
 func main() {
@@ -164,6 +165,13 @@ if err != nil {
 		log.Fatalf("init jwt issuer: %v", err)
 	}
 
+	// Get an Acme token for the harness.
+harnessToken, err := jwtIssuer.Issue("11111111-1111-1111-1111-111111111111")
+if err != nil {
+	log.Fatalf("harness token: %v", err)
+}
+redTeamHarness := redteam.NewHarness("http://localhost:8080/query", harnessToken)
+
 	es := graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{
 			AgentRepo:    agent.NewRepository(database),
@@ -175,6 +183,7 @@ if err != nil {
 			JWTIssuer:    jwtIssuer,
 			AuditHub:     auditHub,
 			Classifier:   classifier,
+			RedTeamHarness: redTeamHarness,
 		},
 	})
 

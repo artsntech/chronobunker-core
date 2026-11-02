@@ -72,6 +72,16 @@ type Mutation struct {
 type Query struct {
 }
 
+type RedTeamResult struct {
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	OwaspCategory string    `json:"owaspCategory"`
+	Status        string    `json:"status"`
+	Detail        string    `json:"detail"`
+	DurationMs    int       `json:"durationMs"`
+	RanAt         time.Time `json:"ranAt"`
+}
+
 type Subscription struct {
 }
 

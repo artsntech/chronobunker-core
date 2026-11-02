@@ -97,6 +97,7 @@ type ComplexityRoot struct {
 		InvokeAgent       func(childComplexity int, input model.InvokeAgentInput) int
 		InvokeTool        func(childComplexity int, input model.InvokeToolInput) int
 		Login             func(childComplexity int, tenantID string) int
+		RunRedTeam        func(childComplexity int) int
 		UpdateAgentStatus func(childComplexity int, input model.UpdateAgentStatusInput) int
 	}
 
@@ -107,8 +108,19 @@ type ComplexityRoot struct {
 		Costs        func(childComplexity int, from time.Time, to time.Time) int
 	}
 
+	RedTeamResult struct {
+		Detail        func(childComplexity int) int
+		DurationMs    func(childComplexity int) int
+		ID            func(childComplexity int) int
+		Name          func(childComplexity int) int
+		OwaspCategory func(childComplexity int) int
+		RanAt         func(childComplexity int) int
+		Status        func(childComplexity int) int
+	}
+
 	Subscription struct {
 		AuditEntryAdded func(childComplexity int) int
+		RedTeamStream   func(childComplexity int) int
 	}
 }
 
@@ -125,6 +137,7 @@ type MutationResolver interface {
 	InvokeAgent(ctx context.Context, input model.InvokeAgentInput) (*model.InvokeAgentResult, error)
 	InvokeTool(ctx context.Context, input model.InvokeToolInput) (*model.InvokeToolResult, error)
 	Login(ctx context.Context, tenantID string) (*model.LoginResult, error)
+	RunRedTeam(ctx context.Context) (bool, error)
 }
 type QueryResolver interface {
 	Agents(ctx context.Context) ([]*agent.Agent, error)
@@ -134,6 +147,7 @@ type QueryResolver interface {
 }
 type SubscriptionResolver interface {
 	AuditEntryAdded(ctx context.Context) (<-chan *model.AuditEntry, error)
+	RedTeamStream(ctx context.Context) (<-chan *model.RedTeamResult, error)
 }
 
 // endregion ************************** generated!.gotpl **************************
@@ -408,6 +422,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.Login(childComplexity, args["tenantId"].(string)), true
+	case "Mutation.runRedTeam":
+		if e.ComplexityRoot.Mutation.RunRedTeam == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Mutation.RunRedTeam(childComplexity), true
 	case "Mutation.updateAgentStatus":
 		if e.ComplexityRoot.Mutation.UpdateAgentStatus == nil {
 			break
@@ -460,12 +480,61 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Query.Costs(childComplexity, args["from"].(time.Time), args["to"].(time.Time)), true
 
+	case "RedTeamResult.detail":
+		if e.ComplexityRoot.RedTeamResult.Detail == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RedTeamResult.Detail(childComplexity), true
+	case "RedTeamResult.durationMs":
+		if e.ComplexityRoot.RedTeamResult.DurationMs == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RedTeamResult.DurationMs(childComplexity), true
+	case "RedTeamResult.id":
+		if e.ComplexityRoot.RedTeamResult.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RedTeamResult.ID(childComplexity), true
+	case "RedTeamResult.name":
+		if e.ComplexityRoot.RedTeamResult.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RedTeamResult.Name(childComplexity), true
+	case "RedTeamResult.owaspCategory":
+		if e.ComplexityRoot.RedTeamResult.OwaspCategory == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RedTeamResult.OwaspCategory(childComplexity), true
+	case "RedTeamResult.ranAt":
+		if e.ComplexityRoot.RedTeamResult.RanAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RedTeamResult.RanAt(childComplexity), true
+	case "RedTeamResult.status":
+		if e.ComplexityRoot.RedTeamResult.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RedTeamResult.Status(childComplexity), true
+
 	case "Subscription.auditEntryAdded":
 		if e.ComplexityRoot.Subscription.AuditEntryAdded == nil {
 			break
 		}
 
 		return e.ComplexityRoot.Subscription.AuditEntryAdded(childComplexity), true
+	case "Subscription.redTeamStream":
+		if e.ComplexityRoot.Subscription.RedTeamStream == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Subscription.RedTeamStream(childComplexity), true
 
 	}
 	return 0, false
@@ -694,6 +763,26 @@ func (ec *executionContext) childFields_LoginResult(ctx context.Context, field g
 		return ec.fieldContext_LoginResult_deviceId(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type LoginResult", field.Name)
+}
+
+func (ec *executionContext) childFields_RedTeamResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_RedTeamResult_id(ctx, field)
+	case "name":
+		return ec.fieldContext_RedTeamResult_name(ctx, field)
+	case "owaspCategory":
+		return ec.fieldContext_RedTeamResult_owaspCategory(ctx, field)
+	case "status":
+		return ec.fieldContext_RedTeamResult_status(ctx, field)
+	case "detail":
+		return ec.fieldContext_RedTeamResult_detail(ctx, field)
+	case "durationMs":
+		return ec.fieldContext_RedTeamResult_durationMs(ctx, field)
+	case "ranAt":
+		return ec.fieldContext_RedTeamResult_ranAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type RedTeamResult", field.Name)
 }
 
 func (ec *executionContext) childFields___Directive(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -2022,6 +2111,29 @@ func (ec *executionContext) fieldContext_Mutation_login(ctx context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_runRedTeam(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_runRedTeam(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Mutation().RunRedTeam(ctx)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_runRedTeam(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Mutation", field, true, true, "Boolean")
+}
+
 func (ec *executionContext) _Query_agents(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2262,6 +2374,167 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _RedTeamResult_id(ctx context.Context, field graphql.CollectedField, obj *model.RedTeamResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RedTeamResult_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RedTeamResult_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RedTeamResult", field, false, false, "ID")
+}
+
+func (ec *executionContext) _RedTeamResult_name(ctx context.Context, field graphql.CollectedField, obj *model.RedTeamResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RedTeamResult_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RedTeamResult_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RedTeamResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _RedTeamResult_owaspCategory(ctx context.Context, field graphql.CollectedField, obj *model.RedTeamResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RedTeamResult_owaspCategory(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.OwaspCategory, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RedTeamResult_owaspCategory(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RedTeamResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _RedTeamResult_status(ctx context.Context, field graphql.CollectedField, obj *model.RedTeamResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RedTeamResult_status(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RedTeamResult_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RedTeamResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _RedTeamResult_detail(ctx context.Context, field graphql.CollectedField, obj *model.RedTeamResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RedTeamResult_detail(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Detail, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RedTeamResult_detail(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RedTeamResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _RedTeamResult_durationMs(ctx context.Context, field graphql.CollectedField, obj *model.RedTeamResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RedTeamResult_durationMs(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DurationMs, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RedTeamResult_durationMs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RedTeamResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _RedTeamResult_ranAt(ctx context.Context, field graphql.CollectedField, obj *model.RedTeamResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RedTeamResult_ranAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.RanAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RedTeamResult_ranAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RedTeamResult", field, false, false, "Time")
+}
+
 func (ec *executionContext) _Subscription_auditEntryAdded(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
 	return graphql.ResolveFieldStream(
 		ctx,
@@ -2289,6 +2562,38 @@ func (ec *executionContext) fieldContext_Subscription_auditEntryAdded(_ context.
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_AuditEntry(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_redTeamStream(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Subscription_redTeamStream(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Subscription().RedTeamStream(ctx)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.RedTeamResult) graphql.Marshaler {
+			return ec.marshalNRedTeamResult2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐRedTeamResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Subscription_redTeamStream(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_RedTeamResult(ctx, field)
 		},
 	}
 	return fc, nil
@@ -3999,6 +4304,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "runRedTeam":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_runRedTeam(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4090,6 +4402,69 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 	return out
 }
 
+var redTeamResultImplementors = []string{"RedTeamResult"}
+
+func (ec *executionContext) _RedTeamResult(ctx context.Context, sel ast.SelectionSet, obj *model.RedTeamResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, redTeamResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RedTeamResult")
+		case "id":
+			out.Values[i] = ec._RedTeamResult_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._RedTeamResult_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "owaspCategory":
+			out.Values[i] = ec._RedTeamResult_owaspCategory(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._RedTeamResult_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "detail":
+			out.Values[i] = ec._RedTeamResult_detail(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "durationMs":
+			out.Values[i] = ec._RedTeamResult_durationMs(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "ranAt":
+			out.Values[i] = ec._RedTeamResult_ranAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var subscriptionImplementors = []string{"Subscription"}
 
 func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
@@ -4105,6 +4480,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	switch fields[0].Name {
 	case "auditEntryAdded":
 		return ec._Subscription_auditEntryAdded(ctx, fields[0])
+	case "redTeamStream":
+		return ec._Subscription_redTeamStream(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
@@ -4654,6 +5031,14 @@ func (ec *executionContext) marshalNLoginResult2ᚖgithubᚗcomᚋartsntechᚋch
 		return graphql.Null
 	}
 	return ec._LoginResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNRedTeamResult2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐRedTeamResult(ctx context.Context, sel ast.SelectionSet, v *model.RedTeamResult) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "RedTeamResult!")
+		return graphql.Null
+	}
+	return ec._RedTeamResult(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {

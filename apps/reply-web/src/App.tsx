@@ -9,6 +9,7 @@ import { SecurityIntercept } from './pages/SecurityIntercept'
 import { BreakerLab } from './pages/BreakerLab'
 import { TenantIsolation } from './pages/TenantIsolation'
 import { AuditTrail } from './pages/AuditTrail'
+import { RedTeamPanel } from './pages/RedTeamPanel'
 
 const GET_BREAKER_STATES = gql`
   query GetBreakerStates {
@@ -90,6 +91,7 @@ export default function App() {
       {view === 'breaker' && <BreakerLab />}
       {view === 'isolation' && <TenantIsolation />}
       {view === 'audit' && <AuditTrail />}
+      {view === 'redteam' && <RedTeamPanel />}
     </Cockpit>
   )
 }

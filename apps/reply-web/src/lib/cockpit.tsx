@@ -1,8 +1,8 @@
-import { Activity, ShieldAlert, Zap, Database, Terminal, LogOut } from 'lucide-react'
+import { Activity, ShieldAlert, Zap, Database, Terminal, LogOut, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { AttentionBar, type Alert } from '../components/AttentionBar'
 
-export type CockpitView = 'monitor' | 'intercept' | 'breaker' | 'isolation' | 'audit'
+export type CockpitView = 'monitor' | 'intercept' | 'breaker' | 'isolation' | 'audit' | 'redteam'
 
 interface CockpitProps {
   view: CockpitView
@@ -19,6 +19,7 @@ const NAV_ITEMS: { key: CockpitView; label: string; icon: React.ReactNode }[] = 
   { key: 'breaker', label: 'BREAKER', icon: <Zap className="w-4 h-4" /> },
   { key: 'isolation', label: 'ISOLATION', icon: <Database className="w-4 h-4" /> },
   { key: 'audit', label: 'AUDIT', icon: <Terminal className="w-4 h-4" /> },
+  { key: 'redteam', label: 'RED TEAM', icon: <ShieldCheck className="w-4 h-4" /> },
 ]
 
 export const Cockpit = ({ view, onNavigate, onLogout, children, threatLevel, alerts }: CockpitProps) => {
