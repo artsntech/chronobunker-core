@@ -351,3 +351,75 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 	return r.OrderRepo.Create(ctx, customerName, input.Product, input.Quantity, total)
 }
+
+func (r *mutationResolver) LaunchMission(ctx context.Context, input model.LaunchMissionInput) (*model.MissionResult, error) {
+	agentRecord, err := r.AgentRepo.GetByID(ctx, "5ca2ccb5-061f-4042-9222-9c076776a2e3")
+	if err != nil {
+		return nil, fmt.Errorf("load agent: %w", err)
+	}
+
+	missionID := fmt.Sprintf("mission-%d", time.Now().Unix())
+	signedToken, err := r.TokenService.Issue(
+		missionID,
+		agentRecord.TenantID,
+		"mission-runner",
+		"mission-device",
+		input.AllowedTools,
+		[]string{"ORD-1234"}, // the order the mission can touch
+		input.BudgetUsd,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("issue token: %w", err)
+	}
+
+	// Canonical params for each tool, matching the JSON Schema in the tools table.
+	toolParams := map[string]map[string]any{
+		"send_email": {
+			"to":        "customer@example.com",
+			"template":  "abandoned_cart",
+			"variables": map[string]any{"discount": "10%"},
+		},
+		"get_order": {
+			"order_id": "ORD-1234",
+		},
+		"search_help_center": {
+			"query": "abandoned cart recovery",
+		},
+		"issue_refund": {
+			"order_id": "ORD-1234",
+			"amount":   100.0,
+			"reason":   "mission demo",
+		},
+	}
+
+	deviceID := "mission-device"
+	executed, blocked := 0, 0
+
+	for _, tool := range input.AllowedTools {
+		params, ok := toolParams[tool]
+		if !ok {
+			blocked++
+			continue
+		}
+
+		_, err := r.Gateway.Invoke(ctx, security.ToolRequest{
+			SignedToken: signedToken,
+			DeviceID:    deviceID,
+			ToolName:    tool,
+			Params:      params,
+		})
+		if err != nil {
+			blocked++
+			continue
+		}
+		executed++
+	}
+
+	return &model.MissionResult{
+		MissionID:       missionID,
+		Status:          "completed",
+		ActionsExecuted: executed,
+		ActionsBlocked:  blocked,
+		TotalSpentUsd:   input.BudgetUsd,
+	}, nil
+}

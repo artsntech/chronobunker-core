@@ -93,11 +93,20 @@ type ComplexityRoot struct {
 		Token    func(childComplexity int) int
 	}
 
+	MissionResult struct {
+		ActionsBlocked  func(childComplexity int) int
+		ActionsExecuted func(childComplexity int) int
+		MissionID       func(childComplexity int) int
+		Status          func(childComplexity int) int
+		TotalSpentUsd   func(childComplexity int) int
+	}
+
 	Mutation struct {
 		CreateAgent       func(childComplexity int, input model.CreateAgentInput) int
 		CreateOrder       func(childComplexity int, input model.CreateOrderInput) int
 		InvokeAgent       func(childComplexity int, input model.InvokeAgentInput) int
 		InvokeTool        func(childComplexity int, input model.InvokeToolInput) int
+		LaunchMission     func(childComplexity int, input model.LaunchMissionInput) int
 		Login             func(childComplexity int, tenantID string) int
 		RunRedTeam        func(childComplexity int) int
 		UpdateAgentStatus func(childComplexity int, input model.UpdateAgentStatusInput) int
@@ -155,6 +164,7 @@ type MutationResolver interface {
 	Login(ctx context.Context, tenantID string) (*model.LoginResult, error)
 	RunRedTeam(ctx context.Context) (bool, error)
 	CreateOrder(ctx context.Context, input model.CreateOrderInput) (*order.Order, error)
+	LaunchMission(ctx context.Context, input model.LaunchMissionInput) (*model.MissionResult, error)
 }
 type QueryResolver interface {
 	Agents(ctx context.Context) ([]*agent.Agent, error)
@@ -397,6 +407,37 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.LoginResult.Token(childComplexity), true
 
+	case "MissionResult.actionsBlocked":
+		if e.ComplexityRoot.MissionResult.ActionsBlocked == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MissionResult.ActionsBlocked(childComplexity), true
+	case "MissionResult.actionsExecuted":
+		if e.ComplexityRoot.MissionResult.ActionsExecuted == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MissionResult.ActionsExecuted(childComplexity), true
+	case "MissionResult.missionId":
+		if e.ComplexityRoot.MissionResult.MissionID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MissionResult.MissionID(childComplexity), true
+	case "MissionResult.status":
+		if e.ComplexityRoot.MissionResult.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MissionResult.Status(childComplexity), true
+	case "MissionResult.totalSpentUsd":
+		if e.ComplexityRoot.MissionResult.TotalSpentUsd == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MissionResult.TotalSpentUsd(childComplexity), true
+
 	case "Mutation.createAgent":
 		if e.ComplexityRoot.Mutation.CreateAgent == nil {
 			break
@@ -441,6 +482,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.InvokeTool(childComplexity, args["input"].(model.InvokeToolInput)), true
+	case "Mutation.launchMission":
+		if e.ComplexityRoot.Mutation.LaunchMission == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_launchMission_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.LaunchMission(childComplexity, args["input"].(model.LaunchMissionInput)), true
 	case "Mutation.login":
 		if e.ComplexityRoot.Mutation.Login == nil {
 			break
@@ -652,6 +704,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("CreateOrderInput", ec.unmarshalInputCreateOrderInput),
 			graphql.NewInputUnmarshaler("InvokeAgentInput", ec.unmarshalInputInvokeAgentInput),
 			graphql.NewInputUnmarshaler("InvokeToolInput", ec.unmarshalInputInvokeToolInput),
+			graphql.NewInputUnmarshaler("LaunchMissionInput", ec.unmarshalInputLaunchMissionInput),
 			graphql.NewInputUnmarshaler("UpdateAgentStatusInput", ec.unmarshalInputUpdateAgentStatusInput),
 		)
 	}
@@ -869,6 +922,22 @@ func (ec *executionContext) childFields_LoginResult(ctx context.Context, field g
 	return nil, fmt.Errorf("no field named %q was found under type LoginResult", field.Name)
 }
 
+func (ec *executionContext) childFields_MissionResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "missionId":
+		return ec.fieldContext_MissionResult_missionId(ctx, field)
+	case "status":
+		return ec.fieldContext_MissionResult_status(ctx, field)
+	case "actionsExecuted":
+		return ec.fieldContext_MissionResult_actionsExecuted(ctx, field)
+	case "actionsBlocked":
+		return ec.fieldContext_MissionResult_actionsBlocked(ctx, field)
+	case "totalSpentUsd":
+		return ec.fieldContext_MissionResult_totalSpentUsd(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type MissionResult", field.Name)
+}
+
 func (ec *executionContext) childFields_Order(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "id":
@@ -1077,6 +1146,20 @@ func (ec *executionContext) field_Mutation_invokeTool_args(ctx context.Context, 
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model.InvokeToolInput, error) {
 			return ec.unmarshalNInvokeToolInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐInvokeToolInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_launchMission_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.LaunchMissionInput, error) {
+			return ec.unmarshalNLaunchMissionInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐLaunchMissionInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -2047,6 +2130,121 @@ func (ec *executionContext) fieldContext_LoginResult_deviceId(_ context.Context,
 	return graphql.NewScalarFieldContext("LoginResult", field, false, false, "String")
 }
 
+func (ec *executionContext) _MissionResult_missionId(ctx context.Context, field graphql.CollectedField, obj *model.MissionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MissionResult_missionId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MissionID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MissionResult_missionId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MissionResult", field, false, false, "ID")
+}
+
+func (ec *executionContext) _MissionResult_status(ctx context.Context, field graphql.CollectedField, obj *model.MissionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MissionResult_status(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MissionResult_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MissionResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _MissionResult_actionsExecuted(ctx context.Context, field graphql.CollectedField, obj *model.MissionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MissionResult_actionsExecuted(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ActionsExecuted, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MissionResult_actionsExecuted(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MissionResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _MissionResult_actionsBlocked(ctx context.Context, field graphql.CollectedField, obj *model.MissionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MissionResult_actionsBlocked(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ActionsBlocked, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MissionResult_actionsBlocked(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MissionResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _MissionResult_totalSpentUsd(ctx context.Context, field graphql.CollectedField, obj *model.MissionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MissionResult_totalSpentUsd(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalSpentUsd, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MissionResult_totalSpentUsd(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MissionResult", field, false, false, "Float")
+}
+
 func (ec *executionContext) _Mutation_createAgent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2328,6 +2526,50 @@ func (ec *executionContext) fieldContext_Mutation_createOrder(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_createOrder_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_launchMission(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_launchMission(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().LaunchMission(ctx, fc.Args["input"].(model.LaunchMissionInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.MissionResult) graphql.Marshaler {
+			return ec.marshalNMissionResult2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐMissionResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_launchMission(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_MissionResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_launchMission_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4386,6 +4628,69 @@ func UnmarshalInvokeToolInput(ctx context.Context, raw any) (model.InvokeToolInp
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputLaunchMissionInput(ctx context.Context, obj any) (model.LaunchMissionInput, error) {
+	var it model.LaunchMissionInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"objective", "budgetUsd", "allowedTools", "autonomyLevel"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "objective":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("objective"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Objective = data
+		case "budgetUsd":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("budgetUsd"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.BudgetUsd = data
+		case "allowedTools":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("allowedTools"))
+			data, err := ec.unmarshalNString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AllowedTools = data
+		case "autonomyLevel":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("autonomyLevel"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AutonomyLevel = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalLaunchMissionInput unmarshals raw into the LaunchMissionInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalLaunchMissionInput(ctx context.Context, raw any) (model.LaunchMissionInput, error) {
+	var out model.LaunchMissionInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "LaunchMissionInput", raw, &out)
+	return out, err
+}
+
 func (ec *executionContext) unmarshalInputUpdateAgentStatusInput(ctx context.Context, obj any) (model.UpdateAgentStatusInput, error) {
 	var it model.UpdateAgentStatusInput
 	if obj == nil {
@@ -4782,6 +5087,59 @@ func (ec *executionContext) _LoginResult(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var missionResultImplementors = []string{"MissionResult"}
+
+func (ec *executionContext) _MissionResult(ctx context.Context, sel ast.SelectionSet, obj *model.MissionResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, missionResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MissionResult")
+		case "missionId":
+			out.Values[i] = ec._MissionResult_missionId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._MissionResult_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "actionsExecuted":
+			out.Values[i] = ec._MissionResult_actionsExecuted(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "actionsBlocked":
+			out.Values[i] = ec._MissionResult_actionsBlocked(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalSpentUsd":
+			out.Values[i] = ec._MissionResult_totalSpentUsd(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -4846,6 +5204,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "createOrder":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createOrder(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "launchMission":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_launchMission(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -5654,12 +6019,25 @@ func (ec *executionContext) marshalNJSON2map(ctx context.Context, sel ast.Select
 	return res
 }
 
+func (ec *executionContext) unmarshalNLaunchMissionInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐLaunchMissionInput(ctx context.Context, v any) (model.LaunchMissionInput, error) {
+	res, err := ec.unmarshalInputLaunchMissionInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNLoginResult2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐLoginResult(ctx context.Context, sel ast.SelectionSet, v *model.LoginResult) graphql.Marshaler {
 	if v == nil {
 		graphql.AddInvalidNullError(ctx, "LoginResult!")
 		return graphql.Null
 	}
 	return ec._LoginResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNMissionResult2ᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐMissionResult(ctx context.Context, sel ast.SelectionSet, v *model.MissionResult) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "MissionResult!")
+		return graphql.Null
+	}
+	return ec._MissionResult(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNOrder2ᚕᚖgithubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋorderᚐOrderᚄ(ctx context.Context, sel ast.SelectionSet, v []*order.Order) graphql.Marshaler {

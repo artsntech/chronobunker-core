@@ -65,10 +65,25 @@ type InvokeToolResult struct {
 	Executed bool           `json:"executed"`
 }
 
+type LaunchMissionInput struct {
+	Objective     string   `json:"objective"`
+	BudgetUsd     float64  `json:"budgetUsd"`
+	AllowedTools  []string `json:"allowedTools"`
+	AutonomyLevel string   `json:"autonomyLevel"`
+}
+
 type LoginResult struct {
 	Token    string `json:"token"`
 	TenantID string `json:"tenantId"`
 	DeviceID string `json:"deviceId"`
+}
+
+type MissionResult struct {
+	MissionID       string  `json:"missionId"`
+	Status          string  `json:"status"`
+	ActionsExecuted int     `json:"actionsExecuted"`
+	ActionsBlocked  int     `json:"actionsBlocked"`
+	TotalSpentUsd   float64 `json:"totalSpentUsd"`
 }
 
 type Mutation struct {

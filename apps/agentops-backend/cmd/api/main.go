@@ -13,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"encoding/json"
+	"fmt"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -147,12 +149,32 @@ if err != nil {
 	}
 
 	gateway := security.NewGateway(database, tokenService, func(ctx context.Context, toolName string, params map[string]any) (any, error) {
-		return map[string]any{
-			"tool":   toolName,
-			"params": params,
-			"status": "executed",
-		}, nil
+	tenantID, err := db.TenantIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	missionID := "mission-001" // in a real system, from the token or context
+	paramsJSON, _ := json.Marshal(params)
+
+	var actionID string
+	err = db.WithTenantTx(ctx, database, func(tx *sql.Tx) error {
+		return tx.QueryRowContext(ctx, `
+			INSERT INTO store_actions (tenant_id, mission_id, action, params, status)
+			VALUES ($1, $2, $3, $4, 'executed')
+			RETURNING id`,
+			tenantID, missionID, toolName, paramsJSON).Scan(&actionID)
 	})
+	if err != nil {
+		return nil, fmt.Errorf("store action: %w", err)
+	}
+
+	return map[string]any{
+		"action_id": actionID,
+		"tool":      toolName,
+		"status":    "executed",
+	}, nil
+})
 
 	privKeyPath := os.Getenv("CHRONO_JWT_PRIVATE_KEY_PATH")
 	if privKeyPath == "" {
