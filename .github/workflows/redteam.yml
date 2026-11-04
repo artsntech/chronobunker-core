@@ -70,6 +70,12 @@ jobs:
         working-directory: apps/agentops-backend
         run: bash ../../scripts/generate_keys.sh
 
+            - name: Check API keys
+        run: |
+          if [ -z "${{ secrets.GROQ_API_KEY }}" ] || [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "::warning::GROQ_API_KEY or GEMINI_API_KEY not set. RT-001 will test fail-closed, not the live classifier."
+          fi
+
       - name: Build backend
         working-directory: apps/agentops-backend
         run: go build -o /tmp/chronobunker-api ./cmd/api

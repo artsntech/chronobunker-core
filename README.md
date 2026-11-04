@@ -25,6 +25,8 @@ bash scripts/generate_keys.sh
 ./just dev-api                # :8080 API, :9090 metrics
 ```
 
+**API keys:** ChronoBunker uses Groq and Gemini as LLM providers. Both offer free tiers. Get your keys at [console.groq.com](https://console.groq.com) and [aistudio.google.com/apikey](https://aistudio.google.com/apikey), and add them to `.env` as `GROQ_API_KEY` e `GEMINI_API_KEY`. O repositório não inclui chaves de API.
+
 ```bash
 # Cockpit (Control Plane)
 cd apps/reply-web && npm install && npm run dev   # :5173
