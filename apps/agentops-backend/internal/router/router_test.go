@@ -63,13 +63,13 @@ const tenantAcme = "11111111-1111-1111-1111-111111111111"
 func TestRouterFallsBackOnProviderFailure(t *testing.T) {
 	database := testDB(t)
 	provider := &mockProvider{failures: 1}
-	r, err := router.NewRouter(database, provider, nil, nil, policyPath(t))
+	r, err := router.NewRouter(database, map[string]router.Provider{"groq": provider}, nil, nil, policyPath(t))
 	if err != nil {
 		t.Fatalf("new router: %v", err)
 	}
 
 	ctx := db.WithTenantID(context.Background(), tenantAcme)
-	completion, modelID, _, err := r.Route(ctx, "triage", "hello", "sess-test")
+	completion, modelID, _, err := r.Route(ctx, "triage", "", "hello", "sess-test")
 	if err != nil {
 		t.Fatalf("route: %v", err)
 	}
@@ -84,14 +84,14 @@ func TestRouterFallsBackOnProviderFailure(t *testing.T) {
 func TestRouterRecordsCostEvent(t *testing.T) {
 	database := testDB(t)
 	provider := &mockProvider{failures: 0}
-	r, err := router.NewRouter(database, provider, nil, nil, policyPath(t))
+	r, err := router.NewRouter(database, map[string]router.Provider{"groq": provider}, nil, nil, policyPath(t))
 	if err != nil {
 		t.Fatalf("new router: %v", err)
 	}
 
 	sessionID := fmt.Sprintf("sess-cost-%d", time.Now().UnixNano())
 	ctx := db.WithTenantID(context.Background(), tenantAcme)
-	_, _, _, err = r.Route(ctx, "triage", "hello", sessionID)
+	_, _, _, err = r.Route(ctx, "triage", "", "hello", sessionID)
 	if err != nil {
 		t.Fatalf("route: %v", err)
 	}

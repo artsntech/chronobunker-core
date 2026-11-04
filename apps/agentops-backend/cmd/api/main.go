@@ -122,11 +122,6 @@ func main() {
 	}
 	go auditHub.Start(context.Background())
 
-	groqProvider, err := router.NewGroqProvider("openai/gpt-oss-120b")
-	if err != nil {
-		log.Fatalf("init groq provider: %v", err)
-	}
-
 	canary := os.Getenv("CHRONO_CANARY_TOKEN")
 	if canary == "" {
 		canary = "CANARY-DEV-ONLY"
@@ -134,11 +129,27 @@ func main() {
 	sanitizer := security.NewOutputSanitizer(canary)
 
 	classifier, err := router.NewIntentClassifier()
-if err != nil {
-	log.Fatalf("init classifier: %v", err)
-}
+	if err != nil {
+		log.Fatalf("init classifier: %v", err)
+	}
 
-	modelRouter, err := router.NewRouter(database, groqProvider, breakerInstance, sanitizer, policyPath)
+	groqProvider, err := router.NewGroqProvider("openai/gpt-oss-120b")
+	if err != nil {
+		log.Fatalf("init groq provider: %v", err)
+	}
+
+	geminiProvider, err := router.NewGeminiProvider("gemini-3.5-flash-lite")
+	if err != nil {
+		log.Fatalf("init gemini provider: %v", err)
+	}
+
+	providers := map[string]router.Provider{
+		"groq":   groqProvider,
+		"gemini": geminiProvider,
+	}
+
+	modelRouter, err := router.NewRouter(database, providers, breakerInstance, sanitizer, policyPath)	
+
 	if err != nil {
 		log.Fatalf("init router: %v", err)
 	}

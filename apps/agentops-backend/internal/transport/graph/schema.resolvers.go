@@ -104,7 +104,7 @@ func (r *mutationResolver) InvokeAgent(ctx context.Context, input model.InvokeAg
 	}
 
 	start := time.Now()
-	completion, modelID, costUSD, err := r.Router.Route(ctx, taskType, input.Prompt, input.SessionID)
+	completion, modelID, costUSD, err := r.Router.Route(ctx, taskType, agentRecord.TargetModel, input.Prompt, input.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("route: %w", err)
 	}
