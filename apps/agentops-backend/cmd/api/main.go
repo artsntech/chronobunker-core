@@ -38,6 +38,7 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/middleware"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/redteam"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/order"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/telemetry"
 )
 
 func main() {
@@ -75,6 +76,15 @@ func main() {
 	}
 	log.Printf("JWT public key: %s", pubKeyPath)
 	log.Printf("routing policy: %s", policyPath)
+
+		// Initialize OpenTelemetry tracing. Fail-open: if the exporter is
+	// unreachable, the API continues without tracing.
+	shutdownTracer := telemetry.InitTracer()
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = shutdownTracer(ctx)
+	}()
 
 	database, err := sql.Open("postgres", dbURL)
 	if err != nil {
