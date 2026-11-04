@@ -1,0 +1,114 @@
+name: Red Team CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  redteam:
+    name: OWASP Scenarios
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: chrono_app
+          POSTGRES_PASSWORD: change_me_in_production
+          POSTGRES_DB: chronobunker
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chrono_app -d chronobunker"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Apply migrations
+        working-directory: apps/agentops-backend
+        env:
+          PGPASSWORD: change_me_in_production
+        run: |
+          for f in ../../db/migrations/*.sql; do
+            echo "Applying $f"
+            psql -h localhost -U chrono_app -d chronobunker -v ON_ERROR_STOP=1 -f "$f" || exit 1
+          done
+
+      - name: Apply seed
+        working-directory: apps/agentops-backend
+        env:
+          PGPASSWORD: change_me_in_production
+        run: |
+          for f in ../../db/seed/*.sql; do
+            echo "Applying $f"
+            psql -h localhost -U chrono_app -d chronobunker -v ON_ERROR_STOP=1 -f "$f" || exit 1
+          done
+
+      - name: Generate JWT keys
+        working-directory: apps/agentops-backend
+        run: bash ../../scripts/generate_keys.sh
+
+      - name: Build backend
+        working-directory: apps/agentops-backend
+        run: go build -o /tmp/chronobunker-api ./cmd/api
+
+      - name: Start backend
+        working-directory: apps/agentops-backend
+        env:
+          CHRONO_DB_URL: postgres://chrono_app:change_me_in_production@localhost:5432/chronobunker?sslmode=disable
+          CHRONO_REDIS_ADDR: localhost:6379
+          CHRONO_JWT_PUBLIC_KEY_PATH: ../../secrets/jwt_public.pem
+          CHRONO_JWT_PRIVATE_KEY_PATH: ../../secrets/jwt_private.pem
+          CHRONO_ROUTING_POLICY_PATH: ../../policies/routing.yaml
+          CHRONO_CANARY_TOKEN: CANARY-CI-TEST
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          /tmp/chronobunker-api &
+          echo $! > /tmp/chronobunker.pid
+          # Wait for the server to be ready.
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/healthz > /dev/null; then
+              echo "Backend is ready"
+              break
+            fi
+            echo "Waiting for backend... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run red team scenarios
+        working-directory: apps/agentops-backend
+        env:
+          CHRONO_REDTEAM_API_URL: http://localhost:8080/query
+          CHRONO_REDTEAM_JWT_SECRET: ../../secrets/jwt_private.pem
+          CHRONO_TEST_DB_URL: postgres://chrono_app:change_me_in_production@localhost:5432/chronobunker?sslmode=disable
+        run: go run ../../scripts/redteam_ci.go
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/chronobunker.pid ]; then
+            kill $(cat /tmp/chronobunker.pid) || true
+          fi
