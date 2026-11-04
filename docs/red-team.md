@@ -63,4 +63,5 @@ Add a new scenario to `internal/redteam/harness.go`:
 
 ```go
 {"RT-006", "Your Scenario Name", "LLM0X", h.yourTestFunction},
+```
 Then implement yourTestFunction with a deterministic assertion. The harness publishes the result via WebSocket automatically.

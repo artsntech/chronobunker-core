@@ -1,9 +1,3 @@
-
----
-
-## `docs/threat-model.md`
-
-```markdown
 # Threat Model (STRIDE)
 
 ChronoBunker's threat model covers the AI agent, the tool execution layer, and the multi-tenant data store.

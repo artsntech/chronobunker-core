@@ -2,13 +2,13 @@
 
 Ordered by value to a prospective enterprise customer. Each item has an estimate in engineer-days.
 
-## 1. OpenAI + Anthropic + Gemini providers (2 days)
+## 1. OpenAI + Anthropic providers (Gemini done) (1.5 days for OpenAI + Anthropic)
 
 The `Provider` interface is already in `internal/router/provider.go`. Each adapter is ~150 lines. The `routing.yaml` already lists the models. This unlocks the fallback chain that the policy promises but cannot deliver today.
 
 **Why first:** without this, the fallback chain is a lie. A CTO will notice.
 
-## 2. OpenTelemetry exporter (1 day)
+## 2. OpenTelemetry exporter (done)
 
 The `otelgqlgen` middleware creates spans, but they are discarded. Add an OTLP exporter to send them to Jaeger or Tempo. This is what makes the system debuggable in production.
 
@@ -17,8 +17,6 @@ The `otelgqlgen` middleware creates spans, but they are discarded. Add an OTLP e
 ## 3. Kubernetes manifests (2 days)
 
 `deploy/k8s/deployment.yaml`, `service.yaml`, `statefulset.yaml` for Postgres, `configmap.yaml`, `secret.yaml`. Probes: `livenessProbe`, `readinessProbe`, `startupProbe`. The `/healthz` endpoint already exists.
-
-**Why third:** Docker Compose works locally, but enterprises run K8s. This is the difference between "I ran it on my laptop" and "I deployed it to production".
 
 ## 4. SSO/SAML (5 days)
 
@@ -44,7 +42,7 @@ A planner agent that decomposes a task, workers that execute, and a conflict res
 
 **Why last:** it is the most ambitious item, and it requires all the infrastructure below it to be solid first.
 
-## 8. Load tests with k6 (2 days)
+## 8. Load tests with k6 (done)
 
 A `k6` script that sends 1000 req/s to `/query` with a valid JWT, measures p50/p95/p99 latency, and verifies that the rate limiter and the circuit breaker behave correctly. Results documented in the README.
 

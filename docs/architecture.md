@@ -34,7 +34,7 @@
 6. **Resolver** extracts `tenant_id` from context, opens a transaction, sets `SET LOCAL app.tenant_id`, queries Postgres.
 7. **Postgres RLS** filters rows by `tenant_id`. A bug in Go cannot leak data.
 8. **Intent classifier** (for `invokeAgent`) validates that the prompt is within the agent's domain.
-9. **Groq provider** calls the LLM with the sanitized prompt.
+9. **The selected provider (Groq or Gemini)** calls the LLM with the sanitized prompt.
 10. **Output sanitizer** strips HTML from the LLM response.
 11. **Cost ledger** records the invocation in `cost_events`.
 12. **Audit trail** records the action with a SHA-256 hash chain.
@@ -49,7 +49,7 @@
 | `internal/breaker` | Circuit breaker FSM | `breaker.go` |
 | `internal/db` | Tenant context, statement timeout | `tenant_conn.go` |
 | `internal/redteam` | OWASP scenario harness | `harness.go` |
-| `internal/router` | Model router + Groq + intent classifier | `router.go`, `classifier.go` |
+| `internal/router` | Model router + Groq + Gemini + intent classifier | `router.go`, `classifier.go` |
 | `internal/security` | Ed25519, sanitizer, gateway, JWT | `capability.go`, `gateway.go`, `jwt_issuer.go` |
 | `internal/telemetry` | Prometheus metrics | `metrics.go` |
 | `internal/transport` | GraphQL + middleware | `graph/`, `middleware/` |
@@ -66,4 +66,4 @@
 
 Local development: `./just dev-api` (Go binary) + `npm run dev` (Vite). Both run on the host. PostgreSQL and Redis are portable binaries.
 
-Production (roadmap): Docker Compose with the Go binary, Postgres, Redis, Prometheus, and Grafana. Kubernetes manifests for the API and the workers.
+Production (roadmap): Kubernetes manifests with the Go binary, Postgres, Redis, Prometheus, Grafana, and Jaeger.

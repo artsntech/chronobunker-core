@@ -103,9 +103,9 @@ Data flow: Browser → JWT RS256 → GraphQL → Resolver → RLS-enforced query
 
 ---
 
-## 🛡️ Security Model (17 layers)
+## 🛡️ Defensive Layer Matrix
 
-ChronoBunker assumes the LLM is hostile, the frontend is compromised, and the network is untrusted. Every layer fails safe.
+ChronoBunker assumes the LLM is hostile, the frontend is compromised, and the network is untrusted. The following mitigations are layered: some are cryptographic (RLS, Ed25519), some are operational (timeouts, rate limits), and some are architectural (circuit breaker, idempotency). Each fails safe.
 
 | Layer | Threat mitigated | Implementation |
 | :--- | :--- | :--- |
@@ -206,11 +206,10 @@ chronobunker-core/
 │   ├── migrations/           # SQL: RLS, triggers, idempotency, orders, store_actions
 │   └── seed/                 # Tenants, models, tools, chaos agent, orders
 ├── policies/routing.yaml     # Model routing rules
-├── deploy/
-│   ├── local/                # Docker Compose (monitoring)
-│   └── k8s/                  # Kubernetes manifests (roadmap)
+├── deploy/        
+│   └── load/                # k6
 └── docs/
-    ├── adr/                  # 6 Architecture Decision Records
+    ├── adr/                  # 7 Architecture Decision Records
     ├── architecture.md
     ├── security-model.md
     ├── threat-model.md
@@ -226,14 +225,14 @@ chronobunker-core/
 ## 📚 Documentation
 
 * **Architecture** — topology, data flow, components
-* **Security model** — 17 layers, threat by threat
+* **Security model** — defensive layer matrix, threat by threat
 * **Threat model (STRIDE)** — formal analysis
 * **Red team harness** — 5 scenarios, OWASP mapping
 * **Operations runbooks** — breaker, classifier, rate limit, audit, RLS
 * **Testing** — test coverage by layer
 * **Limitations** — what is not done (honest)
 * **Roadmap** — what comes next, ordered by value
-* **ADRs** — 6 architecture decisions
+* **ADRs** — 7 architecture decisions
 
 ---
 

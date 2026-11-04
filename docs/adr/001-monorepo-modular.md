@@ -23,7 +23,7 @@ The frontend (`apps/reply-web`) and the evals engine (`apps/evals-engine`) are s
 - **Atomic deploys:** A change to the breaker FSM and the resolver that uses it can be committed, tested, and deployed as one unit. No distributed version skew.
 - **No network boundaries inside the backend:** The tool gateway calls the idempotency engine in-process. The cost is a function call, not a network round-trip.
 - **Shared migrations:** The `db/migrations/` folder is the single source of truth. No distributed schema coordination.
-- **Simpler CI:** One Go test suite, one frontend build, one Docker image. No service mesh, no Kubernetes orchestration required for the backend.
+- **Simpler CI:** One Go test suite, two frontends build. No service mesh, no Kubernetes orchestration required for the backend.
 
 **Negative:**
 - **Single point of failure:** If the Go binary crashes, the entire backend is down. There is no horizontal scaling of individual components.
