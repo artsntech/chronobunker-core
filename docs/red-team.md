@@ -1,6 +1,6 @@
 # Red Team Harness
 
-The cockpit runs an autonomous suite of 5 OWASP-mapped scenarios against the live backend. Each scenario has a deterministic PASS/FAIL assertion. Results are pushed to the browser over WebSocket.
+The cockpit and the CI pipeline run an autonomous suite of 5 OWASP-mapped scenarios against the live backend. Each scenario has a deterministic PASS/FAIL assertion. Results are pushed to the browser over WebSocket.
 
 ## Scenarios
 
@@ -56,6 +56,7 @@ The cockpit runs an autonomous suite of 5 OWASP-mapped scenarios against the liv
 3. Click **RED TEAM** in the sidebar.
 4. Click **Run Full Suite**.
 5. Watch the results appear in real time.
+6. From CI: the .github/workflows/redteam.yml workflow runs on every push and PR.
 
 ## How to extend
 
@@ -64,4 +65,5 @@ Add a new scenario to `internal/redteam/harness.go`:
 ```go
 {"RT-006", "Your Scenario Name", "LLM0X", h.yourTestFunction},
 ```
+
 Then implement yourTestFunction with a deterministic assertion. The harness publishes the result via WebSocket automatically.

@@ -30,12 +30,12 @@ The classifier is called before the main LLM. If `allowed: false`, the request i
 
 **Negative:**
 - **Latency:** The classifier adds ~500-900ms to every single request, roughly doubling the overall response latency.
-- **Groq dependency:** Single point of failure for classification.
+- **Provider dependency:** The classifier depends on Groq as primary and Gemini as fallback. If both are down, classification fails closed.
 - **Bypass via manipulation:** A highly advanced prompt might still trick the classifier LLM.
 
 ## Mitigations
 - **Parallel running:** In a future optimization, the classifier and main LLM can run in parallel for known-safe intents.
-- **Fallback check:** A local small model can act as a fallback classifier if Groq is entirely down.
+- **Provider fallback (implemented):** Groq is the primary classifier; Gemini is the fallback. If Groq fails, the classifier continues on Gemini.
 
 ## When to revisit
 If the classifier's false positive rate is too high, the domain description needs to be refined. If false negatives are high, the classifier needs a stronger model or a supplementary rule-based layer.

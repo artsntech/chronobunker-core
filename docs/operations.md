@@ -5,13 +5,13 @@
 **Symptom:** `chronobunker_breaker_state{target_id="..."} = 2` in Prometheus. The cockpit shows `THREAT: CRITICAL`.
 
 **Diagnosis:**
-1. Check the provider status page (Groq status, OpenAI status).
+1. Check the provider status page (Groq status, Gemini status).
 2. Check the audit log for the last 10 minutes: `SELECT * FROM breaker_transitions ORDER BY created_at DESC LIMIT 20;`
 3. Check the model registry: `SELECT id, status FROM models WHERE id = '<target_id>';`
 
 **Action:**
 - If the provider is down, wait for the cooldown (5 min). The breaker will transition to HALF_OPEN and test recovery.
-- If the model is deprecated (e.g., `llama-3.1-8b-instant`), update the `routing.yaml` and restart the backend.
+- If the model is deprecated (e.g., `gemini-2.5-flash`), update the `routing.yaml` and restart the backend.
 - If the model ID is invalid, fix the agent's `target_model` in the database.
 
 **Prevention:** the `Breaker Lab` in the cockpit forces failures to test the FSM. Run it before deploying a new model.
@@ -23,10 +23,10 @@
 **Diagnosis:**
 1. Check that `GROQ_API_KEY` is set in the environment.
 2. Check the Groq status page.
-3. Check the classifier model ID: `openai/gpt-oss-20b`.
+3. Check the classifier model ID: `openai/gpt-oss-20b`. Primary: `openai/gpt-oss-20b` (Groq). Fallback: `gemini-3.5-flash-lite` (Gemini).
 
 **Action:**
-- If Groq is down, the classifier is down. All `invokeAgent` requests fail closed. This is intentional.
+- If Groq is down, the classifier falls back to Gemini automatically. If both are down, `invokeAgent` fails closed.
 - If the API key is invalid, rotate it.
 - If the model ID changed, update `internal/router/classifier.go`.
 

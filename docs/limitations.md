@@ -11,7 +11,7 @@ ChronoBunker is a working system, not a finished product. This document lists th
 
 ## AI / Agent layer
 
-- **Groq and Gemini are the only implemented providers.** The `routing.yaml` references OpenAI, Anthropic, and Gemini, but only the Groq adapter exists. A fallback to OpenAI would fail with `provider not implemented`.
+- **Groq and Gemini are the only implemented providers.** The `routing.yaml` references OpenAI, Anthropic, and Gemini, but only Groq and Gemini adapters exist. OpenAI and Anthropic are not implemented. A fallback to OpenAI would fail with `provider not implemented`.
 - **No semantic caching.** The `pgvector` extension is not enabled. Every request hits the LLM.
 - **No prompt registry or A/B testing.** Prompts are hardcoded in the agent's `system_prompt` column.
 - **Single-agent execution.** The system invokes one agent per request. No planner, no multi-agent orchestration.
@@ -20,7 +20,7 @@ ChronoBunker is a working system, not a finished product. This document lists th
 
 - **No SSO/SAML.** Authentication is JWT-only. Enterprises require SSO.
 - **No SIEM export.** Audit events live in Postgres. A production deployment must export them to Splunk, Datadog, or Elastic.
-- **No red-team CI.** The red team harness runs at runtime from the cockpit, not in CI on every commit.
+- **No red-team CI.** Red team CI runs on push/PR but not as a pre-commit hook.
 - **Device binding is stubbed.** The `DeviceID` claim is validated, but the client does not generate an ephemeral key pair.
 - **No PII detection.** The output sanitizer strips HTML but does not detect PII in LLM responses.
 - **No revocation list.** A stolen Ed25519 token is valid for its full 5-minute TTL. There is no way to revoke it early.
@@ -34,10 +34,9 @@ ChronoBunker is a working system, not a finished product. This document lists th
 
 ## Testing
 
-- **No load tests.** No k6, no vegeta, no results in the README.
 - **No chaos tests.** No `chaos_test.go` simulating Kafka/Redis failures.
 - **No frontend unit tests.** The frontend is tested via the red team harness (E2E).
-- **No fuzzing.** No `go test -fuzz`.
+- **No fuzzing.** Fuzzing covers the sanitizer only; the classifier is not fuzzed.
 
 ## Deployment
 

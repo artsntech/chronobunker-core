@@ -43,7 +43,7 @@ ChronoBunker's threat model covers the AI agent, the tool execution layer, and t
 | Body flooding | 1 MiB `MaxBytesReader` |
 | Request flooding | 100 req/s per tenant + 20 req/10s per IP |
 | Slowloris | `ReadHeaderTimeout: 5s` |
-| Cascading provider outage | Circuit breaker FSM |
+| Cascading provider outage | Circuit breaker FSM + provider fallback chain (Groq → Gemini) |
 | Query starvation | `statement_timeout = 10s`, `lock_timeout = 5s` |
 
 ## Elevation of Privilege
@@ -59,5 +59,5 @@ ChronoBunker's threat model covers the AI agent, the tool execution layer, and t
 
 - **Physical access** to the database server.
 - **Supply chain attacks** on the Go module dependencies (partially mitigated by `go.sum`).
-- **Model provider compromise** (Groq, OpenAI). The system assumes the LLM is hostile, but it does not verify the provider's infrastructure.
+- **Model provider compromise** (Groq, Gemini). The system assumes the LLM is hostile, but it does not verify the provider's infrastructure.
 - **Side-channel attacks** on the Ed25519 signature verification.

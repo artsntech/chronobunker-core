@@ -27,7 +27,7 @@ Transitions are verified atomically with an `opened_at` timestamp via Redis `TxP
 **Negative:**
 - **State complexity:** Hysteresis thresholds, exponential backoff, and 4 transitions increase bug surface.
 - **Redis dependency:** If Redis is down, the breaker is blind.
-- **Recovery delay:** Fixed cooldowns (e.g. 5 minutes) might delay using a provider that recovered in seconds.
+- **Recovery delay:** Fixed cooldowns (e.g. 30 seconds) might delay using a provider that recovered in milliseconds.
 
 ## Why hysteresis
 Without hysteresis (e.g. trip at 0.6 error rate, recover at 0.9 success), the breaker oscillates wildly on single failure fluctuations. Hysteresis ensures sustained evidence before state changes.

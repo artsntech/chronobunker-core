@@ -4,7 +4,7 @@
 
 ChronoBunker is a production-grade orchestrator for AI agents that execute real-world actions—refunds, emails, database mutations—under strict corporate constraints. Built in Go, React, and PostgreSQL, it combines row-level security, Ed25519 capability tokens, and exactly-once idempotency to make autonomous agents safe to run in regulated environments.
 
-The system has **two frontends**: a **Control Plane** (the operations cockpit for admins) and a **Data Plane** (the Bunker Store for customers). Both use the same JWT, the same RLS, the same Groq provider, and the same audit trail.
+The system has **two frontends**: a **Control Plane** (the operations cockpit for admins) and a **Data Plane** (the Bunker Store for customers). Both use the same JWT, the same RLS, the same LLM providers (Groq and Gemini), and the same audit trail.
 
 [![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)](https://go.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-336791?logo=postgresql)](https://www.postgresql.org/)
@@ -37,7 +37,7 @@ Open http://localhost:5173 (cockpit) and http://localhost:5174 (store). Log in a
 
 ### 🎯 What the frontends prove
 
-Six screens, each corresponding to a real backend guarantee. Every event is real—no simulation.
+Eight screens, each corresponding to a real backend guarantee. Every event is real—no simulation.
 
 #### Cockpit (Control Plane, :5173)
 
@@ -91,9 +91,9 @@ The two frontends share the same backend. A `createOrder` in the store appears i
 │                               └──────────────────────────┘  │
 │             │                                               │
 │             ▼                                               │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  PostgreSQL (RLS) + Redis (Breaker) + Groq (LLM)    │  │
-│  └──────────────────────────────────────────────────────┐  │
+│ ┌───────────────────────────────────────────────────────┐  │
+│ │ PostgreSQL (RLS) + Redis (Breaker) + Groq/Gemini (LLM)│  │
+│ └───────────────────────────────────────────────────────┐  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -114,6 +114,7 @@ ChronoBunker assumes the LLM is hostile, the frontend is compromised, and the ne
 | **Ed25519 Capability Tokens** | Unauthorized tool execution | 5-min TTL, scoped to tools and resource IDs, device-bound |
 | **3-Phase Idempotency** | Duplicate side effects | RESERVE → EXECUTE → COMMIT with ON CONFLICT DO NOTHING |
 | **Circuit Breaker FSM** | Cascading LLM outages | CLOSED → OPEN → HALF_OPEN with exponential backoff |
+| **Provider Fallback Chain** | Single-provider outage | Groq primary, Gemini fallback, per-route policy in `routing.yaml` |
 | **Output Sanitization** | XSS / indirect prompt injection | bluemonday allowlist + DOMPurify. OWASP LLM05 |
 | **Canary Tokens** | System prompt leakage | Secret token in prompt; leak aborts response. OWASP LLM07 |
 | **Semantic Intent Gating** | Out-of-scope prompts | Groq gpt-oss-20b JSON-mode classifier. OWASP LLM01 |
@@ -138,6 +139,8 @@ CHRONO_REDIS_ADDR=localhost:6379 \
 go test ./... -count=1
 ```
 
+**Coverage note:** the total statement coverage is 16.5%, but this number is misleading. The security-critical packages (`internal/security` 68%, `internal/breaker` 78%, `internal/db` 68%) are well covered. The lower total is driven by the integration test packages (`internal/transport/graph`, `internal/order`) and the modules that are tested via the red team harness in CI rather than `go test`. The red team harness covers the end-to-end security properties (RLS, Ed25519, idempotency, circuit breaker) with 5 deterministic scenarios.
+
 ### Coverage by layer
 
 | Package | Tests | What it proves |
@@ -149,7 +152,7 @@ go test ./... -count=1
 | `internal/db` | TestStatementTimeoutAbortsSlowQuery | 10s query timeout |
 | `internal/transport/graph` | TestGraphQLTenantIsolationEndToEnd, TestInvokeToolWithCapabilityToken | Full HTTP → JWT → RLS → response |
 
-Red team harness: 5 OWASP-mapped scenarios run from the cockpit (RED TEAM → Run Full Suite). 5/5 PASS.
+**Red team harness:** 5 OWASP-mapped scenarios run from the cockpit (RED TEAM → Run Full Suite) and from CI (`.github/workflows/redteam.yml`). 5/5 PASS in both.
 
 ---
 
@@ -197,19 +200,23 @@ Why open core? The free tier builds adoption; the enterprise tier pays the bills
 
 ```text
 chronobunker-core/
+├── .github/
+│   └── workflows/            # CI + red team pipeline
 ├── apps/
 │   ├── agentops-backend/     # Go: router, gateway, breaker, audit, redteam
 │   ├── reply-web/            # React: cockpit (Control Plane)
-│   ├── bunker-store/         # React: store + Mission Lab (Data Plane)
-│   └── evals-engine/         # Python: LLM-as-judge (roadmap)
+│   └── bunker-store/         # React: store + Mission Lab (Data Plane)
 ├── db/
 │   ├── migrations/           # SQL: RLS, triggers, idempotency, orders, store_actions
 │   └── seed/                 # Tenants, models, tools, chaos agent, orders
-├── policies/routing.yaml     # Model routing rules
-├── deploy/        
-│   └── load/                # k6
+├── policies/
+│   └── routing.yaml          # Model routing rules
+├── scripts/                  # Key generation, token minting, red team CI
+├── deploy/
+│   └── load/                 # k6 load tests
 └── docs/
     ├── adr/                  # 7 Architecture Decision Records
+    ├── assets/               # Screenshots and diagrams
     ├── architecture.md
     ├── security-model.md
     ├── threat-model.md
@@ -244,14 +251,17 @@ chronobunker-core/
 * [x] 3-phase idempotency (exactly-once side effects)
 * [x] Circuit breaker FSM with Redis state
 * [x] Groq LLM integration (openai/gpt-oss-120b)
-* [x] Semantic intent gating (gpt-oss-20b)
+* [x] Gemini LLM integration (gemini-3.5-flash-lite) with native SDK
+* [x] Provider fallback chain (Groq → Gemini)
+* [x] Semantic intent gating (Groq primary / Gemini fallback)
 * [x] Two frontends: cockpit (Control Plane) + Bunker Store (Data Plane)
 * [x] Mission Lab with budget enforcement
-* [x] Red team harness (5 OWASP scenarios)
+* [x] Red team harness (5 OWASP scenarios) + CI pipeline
 * [x] k6 load tests (createOrder, 50 req/s, 0% errors)
+* [x] OTLP tracing exporter (verified with Jaeger)
 * [ ] Prometheus + Grafana dashboards
 * [ ] Kubernetes manifests with liveness/readiness/startup probes
-* [ ] OpenTelemetry exporter (Jaeger/Tempo)
+* [ ] OpenAI + Anthropic providers
 * [ ] Enterprise SSO/SAML and SIEM export
 
 ---
@@ -265,4 +275,4 @@ chronobunker-core/
 
 ## 🙏 Acknowledgements
 
-Built with `gqlgen`, `go-redis`, `bluemonday`, `ECharts`, and `Groq`.
+Built with `gqlgen`, `go-redis`, `bluemonday`, `ECharts`, `Groq`, and `Gemini`.

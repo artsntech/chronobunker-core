@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-ChronoBunker has three distinct runtime concerns: a Go HTTP/GraphQL API, a React frontend, and a Python evals engine. The system also has tightly coupled infrastructure: PostgreSQL with RLS policies, Redis for the breaker FSM, and a shared model registry.
+ChronoBunker has three distinct runtime concerns: a Go HTTP/GraphQL API, two React frontends (the operations cockpit and the customer-facing Bunker Store), and the shared infrastructure (PostgreSQL with RLS, Redis for the breaker FSM, and a model registry).
 
 The two architectural options were:
 1. **Microservices**: separate deployable units for the API, the agent runtime, the tool gateway, and the frontend. Each with its own database connection, its own CI pipeline, and its own deployment.
@@ -15,7 +15,7 @@ We chose the **modular monorepo**.
 
 The Go backend is a single binary with `internal/` packages that enforce boundaries at compile time. The `internal/agent`, `internal/router`, `internal/breaker`, `internal/security`, and `internal/redteam` packages do not import each other except through explicit interfaces. The `cmd/api` binary wires them together.
 
-The frontend (`apps/reply-web`) and the evals engine (`apps/evals-engine`) are separate deployables, but they live in the same repository because they evolve together.
+The two frontends (`apps/reply-web` and `apps/bunker-store`) are separate deployables, but they live in the same repository because they evolve together.
 
 ## Consequences
 

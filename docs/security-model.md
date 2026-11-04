@@ -77,11 +77,11 @@ A secret token in the system prompt. If it appears in the output, the LLM leaked
 
 ## Layer 8: Semantic intent gating
 
-A fast LLM classifier rejects out-of-scope prompts before the main LLM is called.
+A fast LLM classifier rejects out-of-scope prompts before the main LLM is called. Primary: Groq. Fallback: Gemini. If both fail, the request is rejected (fail-closed).
 
 - **Threat:** prompt injection (OWASP LLM01), out-of-domain queries.
 - **Mitigation:** the classifier is domain-aware and fails closed.
-- **Test:** RT-001 in `internal/redteam/harness.go`.
+- **Test:** RT-001 in `internal/redteam/harness.go` and `scripts/redteam_ci.go`.
 - **ADR:** 005.
 
 ## Layer 9: GraphQL depth and complexity limits
@@ -144,7 +144,15 @@ SET LOCAL statement_timeout = '10s', SET LOCAL lock_timeout = '5s'.
 
 ## Layer 17: CORS and security headers
 
-Strict origin allowlist (`localhost:5173`), CSP default-src 'none', X-Frame-Options: DENY, X-Content-Type-Options: nosniff.
+Strict origin allowlist (`localhost:5173` and `localhost:5174`), CSP default-src 'none', X-Frame-Options: DENY, X-Content-Type-Options: nosniff.
 
 - **Threat:** browser-based attacks, clickjacking, MIME sniffing.
 - **Mitigation:** the middleware sets the headers on every response.
+
+## Layer 18: OTLP tracing
+
+`otelgqlgen` creates spans for every GraphQL operation; the OTLP exporter sends them to Jaeger.
+
+- **Threat:** undiagnosable latency and errors.
+- **Mitigation:** each request has a trace ID; a slow resolver or provider call is visible in Jaeger.
+- **Fail-open:** if Jaeger is unreachable, the API continues without tracing.

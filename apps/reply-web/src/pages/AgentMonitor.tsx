@@ -149,7 +149,7 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
   }
 
   const handleKillSwitch = async (agentId: string, currentStatus: string) => {
-    const nextStatus = currentStatus === 'KILLED' ? 'PRODUCTION' : 'KILLED'
+    const nextStatus = currentStatus === 'killed' ? 'production' : 'killed'
     addLog(`[KILL SWITCH] Changing agent {${agentId}} status to ${nextStatus}...`)
     try {
       await updateAgentStatus({
