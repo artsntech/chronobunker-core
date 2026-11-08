@@ -1,7 +1,3 @@
-
-
-https://github.com/user-attachments/assets/f8a65d75-5fd2-4d47-ae48-2b14ecb67a9f
-
 # ChronoBunker
 
 **Open-source AgentOps platform built for regulated environments. Self-hosted. Zero-trust. Exactly-once.**
@@ -14,7 +10,9 @@ The system has **two frontends**: a **Control Plane** (the operations cockpit fo
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-336791?logo=postgresql)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
 
-🎥 **[Watch the 3-minute demo](https://github.com/user-attachments/assets/74e75b3c-6af8-4b20-a195-f1de49c97bdd)** — See the cockpit, the Bunker Store, the Mission Lab, and the Red Team Harness in action.
+🎥 **[Watch the 3-minute demo](
+https://github.com/user-attachments/assets/f8a65d75-5fd2-4d47-ae48-2b14ecb67a9f
+)** — See the cockpit, the Bunker Store, the Mission Lab, and the Red Team Harness in action.
 
 ### 📸 Screenshots
 
