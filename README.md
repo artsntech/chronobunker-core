@@ -12,6 +12,17 @@ The system has **two frontends**: a **Control Plane** (the operations cockpit fo
 
 🎥 **[Watch the 3-minute demo](https://github.com/artsntech/chronobunker-core/releases/download/v0.1.0-demo/chronobunker-architecture-and-security-demo.mp4)** — See the cockpit, the Bunker Store, the Mission Lab, and the Red Team Harness in action.
 
+### 📸 Screenshots
+
+**Two frontends, one backend:**
+![Cockpit and Bunker Store side by side](docs/assets/cockpit-store.png)
+
+**The Mission Lab blocks an over-budget refund:**
+![Mission Lab blocks a $100 refund against a $50 budget](docs/assets/mission-lab-blocked.png)
+
+**The Red Team Harness passes all 5 OWASP scenarios:**
+![Red Team Harness 5/5 PASS](docs/assets/red-team-pass.png)
+
 ---
 
 ## 🚀 Quickstart
