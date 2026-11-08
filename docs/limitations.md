@@ -20,7 +20,7 @@ ChronoBunker is a working system, not a finished product. This document lists th
 
 - **No SSO/SAML.** Authentication is JWT-only. Enterprises require SSO.
 - **No SIEM export.** Audit events live in Postgres. A production deployment must export them to Splunk, Datadog, or Elastic.
-- **No red-team CI.** Red team CI runs on push/PR but not as a pre-commit hook.
+- **Red team runs on push/PR, not as a pre-commit hook.** A developer can commit a regression locally without seeing the red team fail until the PR is pushed.
 - **Device binding is stubbed.** The `DeviceID` claim is validated, but the client does not generate an ephemeral key pair.
 - **No PII detection.** The output sanitizer strips HTML but does not detect PII in LLM responses.
 - **No revocation list.** A stolen Ed25519 token is valid for its full 5-minute TTL. There is no way to revoke it early.
@@ -36,7 +36,7 @@ ChronoBunker is a working system, not a finished product. This document lists th
 
 - **No chaos tests.** No `chaos_test.go` simulating Kafka/Redis failures.
 - **No frontend unit tests.** The frontend is tested via the red team harness (E2E).
-- **No fuzzing.** Fuzzing covers the sanitizer only; the classifier is not fuzzed.
+- **Fuzzing covers the sanitizer only.** The classifier and the router are not fuzzed.
 
 ## Deployment
 
