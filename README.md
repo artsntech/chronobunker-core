@@ -126,7 +126,7 @@ ChronoBunker assumes the LLM is hostile, the frontend is compromised, and the ne
 | :--- | :--- | :--- |
 | **Postgres RLS** | Cross-tenant data leaks | FORCE ROW LEVEL SECURITY on every tenant-scoped table |
 | **JWT RS256** | Token forgery | Algorithm pinning, audience validation, expiration required |
-| **Ed25519 Capability Tokens** | Unauthorized tool execution | 5-min TTL, scoped to tools and resource IDs, device-bound |
+| **Ed25519 Capability Tokens** | Unauthorized tool execution | 5-min TTL, scoped to tools and resource IDs, DeviceID validated |
 | **3-Phase Idempotency** | Duplicate side effects | RESERVE → EXECUTE → COMMIT with ON CONFLICT DO NOTHING |
 | **Circuit Breaker FSM** | Cascading LLM outages | CLOSED → OPEN → HALF_OPEN with exponential backoff |
 | **Provider Fallback Chain** | Single-provider outage | Groq primary, Gemini fallback, per-route policy in `routing.yaml` |
@@ -262,7 +262,7 @@ chronobunker-core/
 
 * [x] Multi-tenant RLS with Postgres engine enforcement
 * [x] JWT RS256 with algorithm pinning and audience
-* [x] Ed25519 capability tokens with device binding
+* [x] Ed25519 capability tokens with DeviceID validation
 * [x] 3-phase idempotency (exactly-once side effects)
 * [x] Circuit breaker FSM with Redis state
 * [x] Groq LLM integration (openai/gpt-oss-120b)
@@ -274,6 +274,7 @@ chronobunker-core/
 * [x] Red team harness (5 OWASP scenarios) + CI pipeline
 * [x] k6 load tests (createOrder, 50 req/s, 0% errors)
 * [x] OTLP tracing exporter (verified with Jaeger)
+* [ ] Cryptographic device binding (hardware-backed key signing)
 * [ ] Prometheus + Grafana dashboards
 * [ ] Kubernetes manifests with liveness/readiness/startup probes
 * [ ] OpenAI + Anthropic providers
