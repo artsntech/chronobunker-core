@@ -10,6 +10,8 @@ The system has **two frontends**: a **Control Plane** (the operations cockpit fo
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-336791?logo=postgresql)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
 
+🎥 **[Watch the 3-minute demo](COLA_AQUI_O_LINK_DO_LOOM_OU_YOUTUBE)** — See the cockpit, the Bunker Store, the Mission Lab, and the Red Team Harness in action.
+
 ---
 
 ## 🚀 Quickstart
@@ -25,7 +27,7 @@ bash scripts/generate_keys.sh
 ./just dev-api                # :8080 API, :9090 metrics
 ```
 
-**API keys:** ChronoBunker uses Groq and Gemini as LLM providers. Both offer free tiers. Get your keys at [console.groq.com](https://console.groq.com) and [aistudio.google.com/apikey](https://aistudio.google.com/apikey), and add them to `.env` as `GROQ_API_KEY` e `GEMINI_API_KEY`. O repositório não inclui chaves de API.
+**API keys:** ChronoBunker uses Groq and Gemini as LLM providers. Both offer free tiers. Get your keys at [console.groq.com](https://console.groq.com) and [aistudio.google.com/apikey](https://aistudio.google.com/apikey), and add them to `.env` as `GROQ_API_KEY` e `GEMINI_API_KEY`. The repository does not include API keys.
 
 ```bash
 # Cockpit (Control Plane)
@@ -95,7 +97,7 @@ The two frontends share the same backend. A `createOrder` in the store appears i
 │             ▼                                               │
 │ ┌───────────────────────────────────────────────────────┐  │
 │ │ PostgreSQL (RLS) + Redis (Breaker) + Groq/Gemini (LLM)│  │
-│ └───────────────────────────────────────────────────────┐  │
+│ └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -233,15 +235,15 @@ chronobunker-core/
 
 ## 📚 Documentation
 
-* **Architecture** — topology, data flow, components
-* **Security model** — defensive layer matrix, threat by threat
-* **Threat model (STRIDE)** — formal analysis
-* **Red team harness** — 5 scenarios, OWASP mapping
-* **Operations runbooks** — breaker, classifier, rate limit, audit, RLS
-* **Testing** — test coverage by layer
-* **Limitations** — what is not done (honest)
-* **Roadmap** — what comes next, ordered by value
-* **ADRs** — 7 architecture decisions
+* **[Architecture](docs/architecture.md)** — topology, data flow, components
+* **[Security model](docs/security-model.md)** — defensive layer matrix, threat by threat
+* **[Threat model (STRIDE)](docs/threat-model.md)** — formal analysis
+* **[Red team harness](docs/red-team.md)** — 5 scenarios, OWASP mapping
+* **[Operations runbooks](docs/operations.md)** — breaker, classifier, rate limit, audit, RLS
+* **[Testing](docs/testing.md)** — test coverage by layer
+* **[Limitations](docs/limitations.md)** — what is not done (honest)
+* **[Roadmap](docs/roadmap.md)** — what comes next, ordered by value
+* **[ADRs](docs/adr/)** — 7 architecture decisions
 
 ---
 

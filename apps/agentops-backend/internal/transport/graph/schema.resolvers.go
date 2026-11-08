@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"log"
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/breaker"
@@ -192,11 +193,11 @@ func (r *queryResolver) AuditEntries(ctx context.Context, limit int) ([]*model.A
 	var entries []*model.AuditEntry
 	err := db.WithTenantTx(ctx, r.DB, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
-			SELECT id, tenant_id, session_id, tool_name, decision,
-			       prev_hash, row_hash, created_at
-			FROM audit_entries
-			ORDER BY id ASC
-			LIMIT $1`, limit)
+    SELECT id, tenant_id, session_id, tool_name, decision,
+           prev_hash, row_hash, created_at
+    FROM audit_entries
+    ORDER BY id DESC
+    LIMIT $1`, limit)
 		if err != nil {
 			return err
 		}
@@ -398,10 +399,12 @@ func (r *mutationResolver) LaunchMission(ctx context.Context, input model.Launch
 	for _, tool := range input.AllowedTools {
 		params, ok := toolParams[tool]
 		if !ok {
+			log.Printf("mission: no canonical params for tool %q, skipping", tool)
 			blocked++
 			continue
 		}
 
+		log.Printf("mission: trying tool %q with params %+v", tool, params)
 		_, err := r.Gateway.Invoke(ctx, security.ToolRequest{
 			SignedToken: signedToken,
 			DeviceID:    deviceID,
@@ -409,6 +412,7 @@ func (r *mutationResolver) LaunchMission(ctx context.Context, input model.Launch
 			Params:      params,
 		})
 		if err != nil {
+			log.Printf("mission: tool %q blocked: %v", tool, err)
 			blocked++
 			continue
 		}

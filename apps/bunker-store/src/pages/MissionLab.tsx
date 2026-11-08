@@ -54,7 +54,7 @@ const AVAILABLE_TOOLS = ['send_email', 'get_order', 'search_help_center', 'issue
 export const MissionLab = () => {
   const [objective, setObjective] = useState('Recover abandoned carts with a 10% discount')
   const [budget, setBudget] = useState(50)
-  const [selectedTools, setSelectedTools] = useState<string[]>(['send_email', 'apply_discount'])
+  const [selectedTools, setSelectedTools] = useState<string[]>(['send_email', 'get_order'])
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
   const [result, setResult] = useState<MissionResult['launchMission'] | null>(null)
 

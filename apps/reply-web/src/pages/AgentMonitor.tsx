@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { gql } from '@apollo/client'
 import { useQuery, useMutation, useSubscription } from '@apollo/client/react'
 import { Bot, Activity, Zap, ShieldAlert, LogOut } from 'lucide-react'
 import { RuntimePanel } from '../components/RuntimePanel'
 import { LatencyChart } from '../components/LatencyChart'
 import { DirectiveConsole } from '../components/DirectiveConsole'
+import { useApolloClient } from '@apollo/client/react'
 
 const GET_AGENTS_AND_COSTS = gql`
   query GetAgentsAndCosts($from: Time!, $to: Time!) {
@@ -21,6 +22,21 @@ const GET_AGENTS_AND_COSTS = gql`
     costs(from: $from, to: $to) {
       totalUsd
       eventCount
+    }
+  }
+`
+
+const GET_AUDIT_ENTRIES = gql`
+  query GetAuditEntries($limit: Int!) {
+    auditEntries(limit: $limit) {
+      id
+      tenantId
+      sessionId
+      toolName
+      decision
+      prevHash
+      rowHash
+      createdAt
     }
   }
 `
@@ -107,11 +123,16 @@ interface AuditSubscriptionData {
   auditEntryAdded: AuditEntry
 }
 
-interface AgentMonitorProps {
-  onLogout: () => void
+interface AuditEntriesData {
+  auditEntries: AuditEntry[]
 }
 
-export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
+interface AgentMonitorProps {
+  onLogout: () => void
+  view?: string
+}
+
+export const AgentMonitor = ({ onLogout, view }: AgentMonitorProps) => {
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
   const [latencyHistory, setLatencyHistory] = useState<number[]>([])
   const [liveAudit, setLiveAudit] = useState<AuditEntry[]>([])
@@ -136,11 +157,44 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
   const [invokeAgent, { loading: promptLoading }] = useMutation(INVOKE_AGENT)
   const [updateAgentStatus] = useMutation(UPDATE_AGENT_STATUS)
 
+  const client = useApolloClient()
+
+  // Seed the live audit from the database on mount, bypassing the Apollo
+  // cache entirely. The subscription handles new events after that.
+  useEffect(() => {
+  console.log('[AgentMonitor] useEffect running, view:', view)
+  if (view !== 'monitor') return
+
+  client.query({
+    query: GET_AUDIT_ENTRIES,
+    variables: { limit: 20 },
+    fetchPolicy: 'no-cache',
+  }).then((result) => {
+    const typed = result.data as AuditEntriesData | undefined
+    console.log('[AgentMonitor] client.query resolved, entries:', typed?.auditEntries?.length)
+    if (typed?.auditEntries) {
+      console.log('[AgentMonitor] setting liveAudit with entries:', typed.auditEntries.map(e => e.id))
+      setLiveAudit((prev) => {
+        const queryIDs = new Set(typed.auditEntries.map((e) => e.id))
+        const newer = prev.filter((e) => !queryIDs.has(e.id))
+        return [...newer, ...typed.auditEntries].slice(0, 50)
+      })
+    }
+  }).catch((err) => {
+    console.error('[AgentMonitor] fresh audit fetch failed:', err)
+  })
+}, [view, client])
+
   useSubscription(AUDIT_ENTRY_ADDED, {
     onData: ({ data: subData }) => {
       const typed = subData.data as AuditSubscriptionData | undefined
       if (!typed?.auditEntryAdded) return
-      setLiveAudit((prev) => [typed.auditEntryAdded, ...prev.slice(0, 49)])
+      setLiveAudit((prev) => {
+        if (prev.some((e) => e.id === typed.auditEntryAdded.id)) {
+          return prev
+        }
+        return [typed.auditEntryAdded, ...prev.slice(0, 49)]
+      })
     },
   })
 
@@ -219,7 +273,7 @@ export const AgentMonitor = ({ onLogout }: AgentMonitorProps) => {
 
       <RuntimePanel />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
         <div className="lg:col-span-2 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {agents.map((agent) => (

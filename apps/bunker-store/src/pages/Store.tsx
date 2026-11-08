@@ -171,9 +171,9 @@ export const Store = ({ onLogout }: { onLogout: () => void }) => {
             <h2 className="text-lg font-bold text-slate-900 mb-4">Products</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {PRODUCTS.map((product) => (
-                <div key={product.name} className="bg-white border border-slate-200 rounded-xl p-5">
+                <div key={product.name} className="bg-white border border-slate-200 rounded-xl p-4 lg:p-5">
                   <h3 className="font-bold text-slate-900">{product.name}</h3>
-                  <p className="text-sm text-slate-500 mt-1">{product.description}</p>
+                  <p className="hidden lg:block text-sm text-slate-500 mt-1">{product.description}</p>
                   <div className="flex items-center justify-between mt-4">
                     <span className="text-xl font-bold text-slate-900">${product.price}</span>
                     <button

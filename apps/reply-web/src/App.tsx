@@ -78,6 +78,8 @@ export default function App() {
     return <Login onLoginSuccess={() => setIsAuthenticated(true)} />
   }
 
+  console.log('[App] view:', view)
+
   return (
     <Cockpit
       view={view}
@@ -86,12 +88,12 @@ export default function App() {
       threatLevel={threatLevel}
       alerts={alerts}
     >
-      {view === 'monitor' && <AgentMonitor onLogout={handleLogout} />}
-      {view === 'intercept' && <SecurityIntercept />}
-      {view === 'breaker' && <BreakerLab />}
-      {view === 'isolation' && <TenantIsolation />}
-      {view === 'audit' && <AuditTrail />}
-      {view === 'redteam' && <RedTeamPanel />}
+      {view === 'monitor' && <AgentMonitor key={view} view={view} onLogout={handleLogout} />}
+      {view === 'intercept' && <SecurityIntercept key="intercept" />}
+      {view === 'breaker' && <BreakerLab key="breaker" />}
+      {view === 'isolation' && <TenantIsolation key="isolation" />}
+      {view === 'audit' && <AuditTrail key="audit" />}
+      {view === 'redteam' && <RedTeamPanel key="redteam" />}
     </Cockpit>
   )
 }

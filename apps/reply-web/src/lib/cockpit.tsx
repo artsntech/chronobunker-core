@@ -1,9 +1,8 @@
 import { Activity, ShieldAlert, Zap, Database, Terminal, LogOut, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { AttentionBar, type Alert } from '../components/AttentionBar'
-import { Rocket } from 'lucide-react'
 
-export type CockpitView = 'monitor' | 'intercept' | 'breaker' | 'isolation' | 'audit' | 'redteam' | 'mission'
+export type CockpitView = 'monitor' | 'intercept' | 'breaker' | 'isolation' | 'audit' | 'redteam'
 
 interface CockpitProps {
   view: CockpitView
@@ -21,7 +20,6 @@ const NAV_ITEMS: { key: CockpitView; label: string; icon: React.ReactNode }[] = 
   { key: 'isolation', label: 'ISOLATION', icon: <Database className="w-4 h-4" /> },
   { key: 'audit', label: 'AUDIT', icon: <Terminal className="w-4 h-4" /> },
   { key: 'redteam', label: 'RED TEAM', icon: <ShieldCheck className="w-4 h-4" /> },
-  { key: 'mission', label: 'MISSION', icon: <Rocket className="w-4 h-4" /> },
 ]
 
 export const Cockpit = ({ view, onNavigate, onLogout, children, threatLevel, alerts }: CockpitProps) => {
@@ -44,6 +42,8 @@ export const Cockpit = ({ view, onNavigate, onLogout, children, threatLevel, ale
     : threatLevel === 'ELEVATED'
     ? 'text-amber-400 border-amber-500/40'
     : 'text-red-500 border-red-500/40 animate-pulse'
+
+  console.log('[Cockpit] rendering, view:', view, 'children:', children ? 'present' : 'missing')
 
   return (
     <div className="min-h-screen bg-[#030a16] text-slate-100 font-mono relative overflow-hidden">
@@ -90,7 +90,7 @@ export const Cockpit = ({ view, onNavigate, onLogout, children, threatLevel, ale
         </button>
       </aside>
 
-      <div className="lg:ml-48 ml-16">
+      <div className="md:ml-48 ml-16">
         <header className="border-b border-slate-800/60 bg-slate-950/60 backdrop-blur-md px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div>
@@ -114,10 +114,7 @@ export const Cockpit = ({ view, onNavigate, onLogout, children, threatLevel, ale
           </div>
         </header>
 
-        <AttentionBar 
-        alerts={alerts} 
-        onNavigate={(v) => onNavigate(v as CockpitView)} 
-        />
+        <AttentionBar alerts={alerts} onNavigate={(v) => onNavigate(v as CockpitView)} />
 
         <main className="p-6 pb-24">{children}</main>
       </div>
