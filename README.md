@@ -1,8 +1,8 @@
 # ChronoBunker
 
-**Open-source AgentOps platform with bank-grade security. Self-hosted. Zero-trust. Exactly-once.**
+**Open-source AgentOps platform built for regulated environments. Self-hosted. Zero-trust. Exactly-once.**
 
-ChronoBunker is a production-grade orchestrator for AI agents that execute real-world actions—refunds, emails, database mutations—under strict corporate constraints. Built in Go, React, and PostgreSQL, it combines row-level security, Ed25519 capability tokens, and exactly-once idempotency to make autonomous agents safe to run in regulated environments.
+ChronoBunker is a security-first orchestrator for AI agents that execute real-world actions—refunds, emails, database mutations—under strict corporate constraints. Built in Go, React, and PostgreSQL, it combines row-level security, Ed25519 capability tokens, and exactly-once idempotency to make autonomous agents safe to run in regulated environments.
 
 The system has **two frontends**: a **Control Plane** (the operations cockpit for admins) and a **Data Plane** (the Bunker Store for customers). Both use the same JWT, the same RLS, the same LLM providers (Groq and Gemini), and the same audit trail.
 
@@ -38,7 +38,7 @@ bash scripts/generate_keys.sh
 ./just dev-api                # :8080 API, :9090 metrics
 ```
 
-**API keys:** ChronoBunker uses Groq and Gemini as LLM providers. Both offer free tiers. Get your keys at [console.groq.com](https://console.groq.com) and [aistudio.google.com/apikey](https://aistudio.google.com/apikey), and add them to `.env` as `GROQ_API_KEY` e `GEMINI_API_KEY`. The repository does not include API keys.
+**API keys:** ChronoBunker uses Groq and Gemini as LLM providers. Both offer free tiers. Get your keys at [console.groq.com](https://console.groq.com) and [aistudio.google.com/apikey](https://aistudio.google.com/apikey), and add them to `.env` as `GROQ_API_KEY` and `GEMINI_API_KEY`. The repository does not include API keys.
 
 ```bash
 # Cockpit (Control Plane)
@@ -204,8 +204,6 @@ The core is free and self-hosted. The enterprise tier adds what large organizati
 | Multi-region failover | ❌ | ✅ |
 | SLA-backed support | ❌ | ✅ |
 | EU AI Act compliance reporting | ❌ | ✅ |
-
----
 
 Why open core? The free tier builds adoption; the enterprise tier pays the bills.
 
