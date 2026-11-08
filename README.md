@@ -10,7 +10,7 @@ The system has **two frontends**: a **Control Plane** (the operations cockpit fo
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-336791?logo=postgresql)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
 
-🎥 **[Watch the 3-minute demo](COLA_AQUI_O_LINK_DO_LOOM_OU_YOUTUBE)** — See the cockpit, the Bunker Store, the Mission Lab, and the Red Team Harness in action.
+🎥 **[Watch the 3-minute demo](https://github.com/artsntech/chronobunker-core/releases/download/v0.1.0-demo/chronobunker-architecture-and-security-demo.mp4)** — See the cockpit, the Bunker Store, the Mission Lab, and the Red Team Harness in action.
 
 ---
 
