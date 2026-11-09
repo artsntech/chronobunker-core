@@ -40,6 +40,6 @@ ChronoBunker is a working system, not a finished product. This document lists th
 
 ## Deployment
 
-- **No Docker image published.** There is no `Dockerfile` and no CI pipeline that builds a container image. The local development flow uses the Go binary directly.
+- **No pre-built registry images.** Multi-stage `Dockerfile`s and `docker-compose.yml` are included for local and self-hosted builds, but pre-built images are not yet published to Docker Hub or GHCR.
 - **No Terraform.** No infrastructure-as-code for GCP, AWS, or Oracle Cloud.
 - **No multi-region.** No failover, no replication, no global load balancing.
