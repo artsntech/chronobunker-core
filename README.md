@@ -29,6 +29,18 @@ https://github.com/user-attachments/assets/f8a65d75-5fd2-4d47-ae48-2b14ecb67a9f
 
 ## 🚀 Quickstart
 
+### Option A: Docker Compose (Recommended)
+
+```bash
+git clone [https://github.com](https://github.com/artsntech/chronobunker-core.git)
+cd chronobunker-core
+cp .env.example .env          # Add your GROQ_API_KEY and GEMINI_API_KEY
+docker compose up --build
+```
+Access the cockpit at `http://localhost:5173` and store at `http://localhost:5174` (log in as Acme Corp).
+
+### Option B: Local Development (Manual)
+
 **Prerequisites:** Go 1.22+, PostgreSQL 16+, Redis 7+, Node.js 20+.
 
 ```bash
@@ -229,17 +241,19 @@ chronobunker-core/
 ├── scripts/                  # Key generation, token minting, red team CI
 ├── deploy/
 │   └── load/                 # k6 load tests
-└── docs/
-    ├── adr/                  # 7 Architecture Decision Records
-    ├── assets/               # Screenshots and diagrams
-    ├── architecture.md
-    ├── security-model.md
-    ├── threat-model.md
-    ├── red-team.md
-    ├── operations.md
-    ├── testing.md
-    ├── limitations.md
-    └── roadmap.md
+├── docs/
+|   ├── adr/                  # 7 Architecture Decision Records
+|   ├── assets/               # Screenshots and diagrams
+|   ├── architecture.md
+|   ├── security-model.md
+|   ├── threat-model.md
+|   ├── red-team.md
+|   ├── operations.md
+|   ├── testing.md
+|   ├── limitations.md
+|   └── roadmap.md
+├── docker-compose.yml        # Full-stack container orchestration
+└── justfile                  # Local task runner
 ```
 
 ---
