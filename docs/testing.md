@@ -29,6 +29,8 @@ go test ./... -count=1
 | `internal/transport/graph` | `TestGraphQLTenantIsolationEndToEnd` | Full HTTP → JWT → RLS → response |
 | `internal/transport/graph` | `TestInvokeToolWithCapabilityToken` | Ed25519 end-to-end |
 | `internal/transport/graph` | `TestInvokeToolRejectsUnauthorizedTool` | Tool scoping |
+| `internal/order` | TestOrderRLS | RLS isolates orders per tenant |
+| `internal/transport/graph` | TestInvokeAgentResolver | Resolver calls router and returns completion |
 
 ## Red team harness
 
@@ -40,4 +42,4 @@ The red team harness (`internal/redteam/harness.go`) runs against the live backe
 - **Frontend unit tests:** No Vitest setup. The frontend is tested via the red team harness (E2E).
 - **Multi-region failover:** No leader election tests. The system is single-node.
 
-**Coverage note:** the total statement coverage is 16.5%, but this number is misleading. The security-critical packages (`internal/security` 68%, `internal/breaker` 78%, `internal/db` 68%) are well covered. The lower total is driven by the integration test packages (`internal/transport/graph`, `internal/order`) and the modules that are tested via the red team harness in CI rather than `go test`. The red team harness covers the end-to-end security properties (RLS, Ed25519, idempotency, circuit breaker) with 5 deterministic scenarios.
+**Coverage note:** the total statement coverage is 17.6%, but this number is misleading. The security-critical packages (`internal/security` 68%, `internal/breaker` 78%, `internal/db` 68%) are well covered. The lower total is driven by the integration test packages (`internal/transport/graph`, `internal/order`) and the modules that are tested via the red team harness in CI rather than `go test`. The red team harness covers the end-to-end security properties (RLS, Ed25519, idempotency, circuit breaker) with 5 deterministic scenarios.
