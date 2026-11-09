@@ -15,7 +15,7 @@ type CapabilityToken struct {
 	SessionID    string   `json:"sid"`
 	TenantID     string   `json:"tid"`
 	UserID       string   `json:"uid"`
-	DeviceID     string   `json:"did"`      // NEW: opaque device identifier
+	DeviceID     string   `json:"did"` // NEW: opaque device identifier
 	AllowedTools []string `json:"tools"`
 	ResourceIDs  []string `json:"resources"`
 	MaxAmount    float64  `json:"max_amt"`

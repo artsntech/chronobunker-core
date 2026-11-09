@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -32,11 +32,11 @@ type Completion struct {
 
 // Router routes completions through a fallback chain.
 type Router struct {
-	db       *sql.DB
+	db        *sql.DB
 	providers map[string]Provider // "groq" → GroqProvider, "gemini" → GeminiProvider
-	policy   RoutingPolicy
-	cache    *modelCache
-	breaker  *breaker.Breaker
+	policy    RoutingPolicy
+	cache     *modelCache
+	breaker   *breaker.Breaker
 	sanitizer *security.OutputSanitizer // NEW
 }
 

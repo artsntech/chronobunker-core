@@ -3,10 +3,10 @@ package security_test
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"sync/atomic"
 	"testing"
-	"fmt"
 	"time"
 
 	_ "github.com/lib/pq"

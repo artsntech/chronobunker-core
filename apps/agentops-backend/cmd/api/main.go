@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -13,8 +15,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"encoding/json"
-	"fmt"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -32,13 +32,13 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/audit"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/breaker"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/order"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/redteam"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/router"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/telemetry"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/middleware"
-	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/redteam"
-	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/order"
-	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/telemetry"
 )
 
 func main() {
@@ -77,7 +77,7 @@ func main() {
 	log.Printf("JWT public key: %s", pubKeyPath)
 	log.Printf("routing policy: %s", policyPath)
 
-		// Initialize OpenTelemetry tracing. Fail-open: if the exporter is
+	// Initialize OpenTelemetry tracing. Fail-open: if the exporter is
 	// unreachable, the API continues without tracing.
 	shutdownTracer := telemetry.InitTracer()
 	defer func() {
@@ -158,7 +158,7 @@ func main() {
 		"gemini": geminiProvider,
 	}
 
-	modelRouter, err := router.NewRouter(database, providers, breakerInstance, sanitizer, policyPath)	
+	modelRouter, err := router.NewRouter(database, providers, breakerInstance, sanitizer, policyPath)
 
 	if err != nil {
 		log.Fatalf("init router: %v", err)
@@ -170,32 +170,32 @@ func main() {
 	}
 
 	gateway := security.NewGateway(database, tokenService, func(ctx context.Context, toolName string, params map[string]any) (any, error) {
-	tenantID, err := db.TenantIDFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
+		tenantID, err := db.TenantIDFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
 
-	missionID := "mission-001" // in a real system, from the token or context
-	paramsJSON, _ := json.Marshal(params)
+		missionID := "mission-001" // in a real system, from the token or context
+		paramsJSON, _ := json.Marshal(params)
 
-	var actionID string
-	err = db.WithTenantTx(ctx, database, func(tx *sql.Tx) error {
-		return tx.QueryRowContext(ctx, `
+		var actionID string
+		err = db.WithTenantTx(ctx, database, func(tx *sql.Tx) error {
+			return tx.QueryRowContext(ctx, `
 			INSERT INTO store_actions (tenant_id, mission_id, action, params, status)
 			VALUES ($1, $2, $3, $4, 'executed')
 			RETURNING id`,
-			tenantID, missionID, toolName, paramsJSON).Scan(&actionID)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("store action: %w", err)
-	}
+				tenantID, missionID, toolName, paramsJSON).Scan(&actionID)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("store action: %w", err)
+		}
 
-	return map[string]any{
-		"action_id": actionID,
-		"tool":      toolName,
-		"status":    "executed",
-	}, nil
-})
+		return map[string]any{
+			"action_id": actionID,
+			"tool":      toolName,
+			"status":    "executed",
+		}, nil
+	})
 
 	privKeyPath := os.Getenv("CHRONO_JWT_PRIVATE_KEY_PATH")
 	if privKeyPath == "" {
@@ -210,27 +210,27 @@ func main() {
 	}
 
 	// Get an Acme token for the harness.
-harnessToken, err := jwtIssuer.Issue("11111111-1111-1111-1111-111111111111")
-if err != nil {
-	log.Fatalf("harness token: %v", err)
-}
-redTeamHarness := redteam.NewHarness("http://localhost:8080/query", harnessToken)
+	harnessToken, err := jwtIssuer.Issue("11111111-1111-1111-1111-111111111111")
+	if err != nil {
+		log.Fatalf("harness token: %v", err)
+	}
+	redTeamHarness := redteam.NewHarness("http://localhost:8080/query", harnessToken)
 
-auditLog := security.NewAuditLog(database)
+	auditLog := security.NewAuditLog(database)
 
 	es := graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{
-			AgentRepo:    agent.NewRepository(database),
-			Router:       modelRouter,
-			DB:           database,
-			TokenService: tokenService,
-			Gateway:      gateway,
-			Breaker:      breakerInstance,
-			JWTIssuer:    jwtIssuer,
-			AuditHub:     auditHub,
-			Classifier:   classifier,
+			AgentRepo:      agent.NewRepository(database),
+			Router:         modelRouter,
+			DB:             database,
+			TokenService:   tokenService,
+			Gateway:        gateway,
+			Breaker:        breakerInstance,
+			JWTIssuer:      jwtIssuer,
+			AuditHub:       auditHub,
+			Classifier:     classifier,
 			RedTeamHarness: redTeamHarness,
-			OrderRepo: order.NewRepository(database, auditLog),
+			OrderRepo:      order.NewRepository(database, auditLog),
 		},
 	})
 
@@ -330,13 +330,13 @@ auditLog := security.NewAuditLog(database)
 	}
 
 	go func() {
-    metricsMux := http.NewServeMux()
-    metricsMux.Handle("/metrics", middleware.CORS(promhttp.Handler()))
-    log.Println("metrics listening on :9090")
-    if err := http.ListenAndServe(":9090", metricsMux); err != nil {
-        log.Printf("metrics server: %v", err)
-    }
-}()
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", middleware.CORS(promhttp.Handler()))
+		log.Println("metrics listening on :9090")
+		if err := http.ListenAndServe(":9090", metricsMux); err != nil {
+			log.Printf("metrics server: %v", err)
+		}
+	}()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

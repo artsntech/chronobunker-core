@@ -6,7 +6,8 @@
 // to the apps/agentops-backend working directory.
 //
 // Usage (from apps/agentops-backend/):
-//   go run scripts/mint_token.go <tenant_id> [private_key_path]
+//
+//	go run scripts/mint_token.go <tenant_id> [private_key_path]
 package main
 
 import (
@@ -44,13 +45,13 @@ func main() {
 	}
 
 	claims := jwt.MapClaims{
-	"tenant_id": tenantID,
-	"device_id": deviceID,
-	"iss":       "chronobunker",
-	"aud":       "chronobunker-api",
-	"iat":       time.Now().Unix(),
-	"exp":       time.Now().Add(time.Hour).Unix(),
-}
+		"tenant_id": tenantID,
+		"device_id": deviceID,
+		"iss":       "chronobunker",
+		"aud":       "chronobunker-api",
+		"iat":       time.Now().Unix(),
+		"exp":       time.Now().Add(time.Hour).Unix(),
+	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	signed, err := token.SignedString(key)
 	if err != nil {

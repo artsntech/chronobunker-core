@@ -16,7 +16,7 @@ import (
 // ToolRequest is a request from an agent to invoke a tool.
 type ToolRequest struct {
 	SignedToken string
-	DeviceID    string  // NEW: must match the token's DeviceID claim
+	DeviceID    string // NEW: must match the token's DeviceID claim
 	ToolName    string
 	Params      map[string]any
 }

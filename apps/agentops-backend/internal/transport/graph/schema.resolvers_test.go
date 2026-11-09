@@ -2,10 +2,10 @@ package graph_test
 
 import (
 	"context"
-	"testing"
+	"os"
 	"path/filepath"
 	"runtime"
-	"os"
+	"testing"
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
@@ -54,7 +54,7 @@ func TestInvokeAgentResolver(t *testing.T) {
 		t.Fatalf("list agents: %v", err)
 	}
 	if len(agents) == 0 {
-    	t.Fatal("no agents found; run db-seed first")
+		t.Fatal("no agents found; run db-seed first")
 	}
 
 	// Pick the Acme Triage Agent explicitly. agents[0] may be the Chaos Agent,

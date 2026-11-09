@@ -6,25 +6,25 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/agent"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/audit"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/breaker"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/order"
+	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/redteam"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/router"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/security"
-	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/redteam"
-	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/order"
 )
 
 // Resolver is the root dependency container for GraphQL resolvers.
 type Resolver struct {
-	AgentRepo    *agent.Repository
-	Router       *router.Router
-	DB           *sql.DB
-	TokenService *security.TokenService
-	Gateway      *security.Gateway
-	Breaker      *breaker.Breaker
-	JWTIssuer    *security.JWTIssuer
-	AuditHub     *audit.Hub
-	Classifier 	 *router.IntentClassifier
+	AgentRepo      *agent.Repository
+	Router         *router.Router
+	DB             *sql.DB
+	TokenService   *security.TokenService
+	Gateway        *security.Gateway
+	Breaker        *breaker.Breaker
+	JWTIssuer      *security.JWTIssuer
+	AuditHub       *audit.Hub
+	Classifier     *router.IntentClassifier
 	RedTeamHarness *redteam.Harness
-	OrderRepo 	*order.Repository
+	OrderRepo      *order.Repository
 }
 
 type queryResolver struct{ *Resolver }

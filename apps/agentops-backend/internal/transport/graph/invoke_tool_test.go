@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"fmt"
 	"testing"
 	"time"
-	"fmt"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 

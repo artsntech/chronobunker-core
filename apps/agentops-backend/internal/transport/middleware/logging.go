@@ -1,12 +1,12 @@
 package middleware
 
 import (
+	"bufio"
 	"log/slog"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
-	"bufio"
-	"net"
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/telemetry"

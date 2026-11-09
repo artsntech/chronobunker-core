@@ -3,7 +3,7 @@ package agent_test
 import (
 	"context"
 	"database/sql"
-		"errors"
+	"errors"
 	"os"
 	"testing"
 

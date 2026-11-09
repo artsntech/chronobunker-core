@@ -5,11 +5,11 @@ package audit
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
-	"strings"
-	"fmt"
 
 	"github.com/lib/pq"
 

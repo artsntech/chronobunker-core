@@ -12,7 +12,7 @@ import (
 // schemaCache caches compiled JSON schemas by tool name so that repeated
 // invocations do not recompile the schema on every request.
 type schemaCache struct {
-	mu      sync.RWMutex
+	mu       sync.RWMutex
 	compiled map[string]*jsonschema.Schema
 }
 

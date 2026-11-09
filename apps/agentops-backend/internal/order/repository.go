@@ -107,13 +107,13 @@ func (r *Repository) Create(ctx context.Context, customerName, product string, q
 	}
 
 	// Audit the action. This is what the cockpit sees.
-_ = r.audit.RecordAction(ctx, "store-session", "create_order", map[string]any{
-	"order_id":  o.ID,
-	"product":   o.Product,
-	"quantity":  o.Quantity,
-	"total_usd": o.TotalUSD,
-	"status":    o.Status,
-}, o, "allowed")
+	_ = r.audit.RecordAction(ctx, "store-session", "create_order", map[string]any{
+		"order_id":  o.ID,
+		"product":   o.Product,
+		"quantity":  o.Quantity,
+		"total_usd": o.TotalUSD,
+		"status":    o.Status,
+	}, o, "allowed")
 
 	return o, nil
 }
