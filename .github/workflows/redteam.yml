@@ -47,7 +47,8 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version-file: 'apps/agentops-backend/go.mod'
+          cache-dependency-path: apps/agentops-backend/go.sum
 
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
@@ -76,7 +77,7 @@ jobs:
         working-directory: apps/agentops-backend
         run: bash ../../scripts/generate_keys.sh
 
-            - name: Check API keys
+      - name: Check API keys
         run: |
           if [ -z "${{ secrets.GROQ_API_KEY }}" ] || [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
             echo "::warning::GROQ_API_KEY or GEMINI_API_KEY not set. RT-001 will test fail-closed, not the live classifier."
@@ -100,7 +101,6 @@ jobs:
         run: |
           /tmp/chronobunker-api &
           echo $! > /tmp/chronobunker.pid
-          # Wait for the server to be ready.
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8080/healthz > /dev/null; then
               echo "Backend is ready"
