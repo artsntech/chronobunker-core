@@ -156,7 +156,7 @@ CHRONO_REDIS_ADDR=localhost:6379 \
 go test ./... -count=1
 ```
 
-**Coverage note:** the total statement coverage is 16.5%, but this number is misleading. The security-critical packages (`internal/security` 68%, `internal/breaker` 78%, `internal/db` 68%) are well covered. The lower total is driven by the integration test packages (`internal/transport/graph`, `internal/order`) and the modules that are tested via the red team harness in CI rather than `go test`. The red team harness covers the end-to-end security properties (RLS, Ed25519, idempotency, circuit breaker) with 5 deterministic scenarios.
+**Coverage note:** the total statement coverage is 17.6%, but this number is misleading. The security-critical packages (`internal/security` 68%, `internal/breaker` 78%, `internal/db` 68%) are well covered. The lower total is driven by the integration test packages (`internal/transport/graph`, `internal/order`) and the modules that are tested via the red team harness in CI rather than `go test`. The red team harness covers the end-to-end security properties (RLS, Ed25519, idempotency, circuit breaker) with 5 deterministic scenarios.
 
 ### Coverage by layer
 
