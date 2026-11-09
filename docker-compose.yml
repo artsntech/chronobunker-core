@@ -1,0 +1,131 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chronobunker-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: change_me_in_production
+      POSTGRES_DB: chronobunker
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chrono_app -d chronobunker"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: chronobunker-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+    # Runs key generation, DB migrations, and DB seeds once before starting the API
+  init-setup:
+    build:
+      context: ./apps/agentops-backend
+      dockerfile: Dockerfile
+    container_name: chronobunker-init
+    user: "0:0"
+    env_file:
+      - .env
+    environment:
+      CHRONO_DB_HOST: postgres
+      CHRONO_DB_PORT: "5432"
+      CHRONO_DB_NAME: chronobunker
+      CHRONO_DB_USER: postgres
+      CHRONO_DB_PASSWORD: change_me_in_production
+      CHRONO_DB_SSLMODE: disable
+      CHRONO_DB_URL: postgres://chrono_app:change_me_in_production@postgres:5432/chronobunker?sslmode=disable
+      CHRONO_REDIS_ADDR: redis:6379
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./db:/app/db:ro
+      - ./secrets:/app/secrets
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        bash scripts/generate_keys.sh
+        chown -R 10001:10001 /app/secrets
+        bash scripts/db_migrate.sh
+        bash scripts/db_seed.sh
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ./apps/agentops-backend
+      dockerfile: Dockerfile
+    container_name: chronobunker-api
+    env_file:
+      - .env
+    environment:
+      CHRONO_DB_URL: postgres://chrono_app:change_me_in_production@postgres:5432/chronobunker?sslmode=disable
+      CHRONO_REDIS_ADDR: redis:6379
+      CHRONO_JWT_PUBLIC_KEY_PATH: secrets/jwt_public.pem
+      CHRONO_JWT_PRIVATE_KEY_PATH: secrets/jwt_private.pem
+      CHRONO_ROUTING_POLICY_PATH: policies/routing.yaml
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    volumes:
+      - ./policies:/app/policies:ro
+      - ./secrets:/app/secrets:ro
+    depends_on:
+      init-setup:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: ./apps/agentops-backend
+      dockerfile: Dockerfile
+    container_name: chronobunker-worker
+    env_file:
+      - .env
+    environment:
+      CHRONO_DB_URL: postgres://chrono_app:change_me_in_production@postgres:5432/chronobunker?sslmode=disable
+      CHRONO_REDIS_ADDR: redis:6379
+      CHRONO_JWT_PUBLIC_KEY_PATH: secrets/jwt_public.pem
+      CHRONO_JWT_PRIVATE_KEY_PATH: secrets/jwt_private.pem
+      CHRONO_ROUTING_POLICY_PATH: policies/routing.yaml
+    volumes:
+      - ./policies:/app/policies:ro
+      - ./secrets:/app/secrets:ro
+    entrypoint: ["/app/chronobunker-worker"]
+    depends_on:
+      init-setup:
+        condition: service_completed_successfully
+
+  cockpit:
+    build:
+      context: ./apps/reply-web
+      dockerfile: Dockerfile
+    container_name: chronobunker-cockpit
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+  store:
+    build:
+      context: ./apps/bunker-store
+      dockerfile: Dockerfile
+    container_name: chronobunker-store
+    ports:
+      - "5174:80"
+    depends_on:
+      - backend
+
+volumes:
+  pg_data:

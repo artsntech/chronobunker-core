@@ -8,7 +8,7 @@ export interface RuntimeMetrics {
   gcCount: number
 }
 
-const METRICS_URL = 'http://localhost:9090/metrics'
+const METRICS_URL = '/metrics'
 
 export async function fetchRuntimeMetrics(): Promise<RuntimeMetrics> {
   const res = await fetch(METRICS_URL)

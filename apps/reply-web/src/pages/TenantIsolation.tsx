@@ -113,7 +113,7 @@ export const TenantIsolation = () => {
     setAuthenticating((prev) => ({ ...prev, [tenantKey]: true }))
 
     const baseClient = new ApolloClient({
-      link: new HttpLink({ uri: 'http://localhost:8080/query' }),
+      link: new HttpLink({ uri: '/query' }),
       cache: new InMemoryCache(),
     })
 
@@ -136,7 +136,7 @@ export const TenantIsolation = () => {
         },
       }))
       const tenantClient = new ApolloClient({
-        link: authLink.concat(new HttpLink({ uri: 'http://localhost:8080/query' })),
+        link: authLink.concat(new HttpLink({ uri: '/query' })),
         cache: new InMemoryCache(),
       })
 
