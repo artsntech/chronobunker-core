@@ -32,11 +32,15 @@ https://github.com/user-attachments/assets/f8a65d75-5fd2-4d47-ae48-2b14ecb67a9f
 ### Option A: Docker Compose (Recommended)
 
 ```bash
-git clone [https://github.com](https://github.com/artsntech/chronobunker-core.git)
+git clone https://github.com/artsntech/chronobunker-core.git
 cd chronobunker-core
-cp .env.example .env          # Add your GROQ_API_KEY and GEMINI_API_KEY
+cp .env.example .env
+# Edit .env and add your GROQ_API_KEY and GEMINI_API_KEY (both free tier)
 docker compose up --build
 ```
+
+Note: the stack will not start without valid API keys. Get them at console.groq.com and aistudio.google.com/apikey.
+
 Access the cockpit at `http://localhost:5173` and store at `http://localhost:5174` (log in as Acme Corp).
 
 ### Option B: Local Development (Manual)
