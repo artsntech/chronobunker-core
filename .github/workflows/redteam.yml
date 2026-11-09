@@ -1,10 +1,16 @@
 name: Red Team CI
 
+# This workflow requires GROQ_API_KEY and GEMINI_API_KEY to be configured
+# as repository secrets. It is intentionally manual-only: the maintainer
+# does not ship API keys with the repository, and the CI should not fail
+# on every push because the keys are absent.
+#
+# To run it:
+#   1. Go to the Actions tab.
+#   2. Select "Red Team CI" in the left sidebar.
+#   3. Click "Run workflow".
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   redteam:
