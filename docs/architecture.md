@@ -80,6 +80,8 @@
 
 ## Deployment
 
-Local development: `./just dev-api` (Go binary) + `npm run dev` (Vite). Both run on the host. PostgreSQL and Redis are portable binaries. Jaeger is optional.
+**Docker Compose (recommended):** `docker compose up --build` orchestrates the entire stack across isolated containers: `postgres` (with RLS migrations and seeds), `redis`, `backend` (Go API + worker), `cockpit` (Nginx + React), and `store` (Nginx + React). Nginx proxies `/query` and `/metrics` internally to the backend service.
 
-Production (roadmap): Kubernetes manifests with the Go binary, Postgres, Redis, Prometheus, Grafana, and Jaeger.
+**Local development (manual):** `./just dev-api` (Go binary) + `npm run dev` (Vite with local proxy for `/query` and `/metrics`). PostgreSQL and Redis run on the host. Jaeger is optional.
+
+**Production (roadmap):** Kubernetes manifests with the Go binary, Postgres, Redis, Prometheus, Grafana, and Jaeger.
