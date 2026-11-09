@@ -39,7 +39,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Note: the stack will not start without valid API keys. Get them at console.groq.com and aistudio.google.com/apikey.
+Note: the stack will not start without valid API keys. Get them at `console.groq.com` and `aistudio.google.com/ apikey`.
 
 Access the cockpit at `http://localhost:5173` and store at `http://localhost:5174` (log in as Acme Corp).
 
