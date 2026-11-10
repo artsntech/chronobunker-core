@@ -206,7 +206,7 @@ The `invokeAgent` mutation is limited by Groq's free tier (~30 req/min), not by 
 
 ---
 
-## 💰 Enterprise Edition (Planned)
+## 💰 Enterprise Edition
 
 The core is free and self-hosted. The enterprise tier adds what large organizations actually buy:
 
@@ -222,6 +222,8 @@ The core is free and self-hosted. The enterprise tier adds what large organizati
 | Multi-region failover | ❌ | ✅ |
 | SLA-backed support | ❌ | ✅ |
 | EU AI Act compliance reporting | ❌ | ✅ |
+
+**The Enterprise Edition is now available:** [ChronoBunker Enterprise](https://github.com/artsntech/chronobunker-enterprise) — OpenAI/MCP proxy, sub-ms revocation, EU AI Act dossier, Enterprise Console. Commercial license.
 
 Why open core? The free tier builds adoption; the enterprise tier pays the bills.
 
