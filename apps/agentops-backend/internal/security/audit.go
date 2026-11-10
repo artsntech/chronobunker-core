@@ -6,11 +6,14 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/db"
 )
+
+const genesisHash = "0000000000000000000000000000000000000000000000000000000000000000"
 
 // AuditLog records every tool decision in an append-only hash chain.
 type AuditLog struct {
@@ -22,102 +25,116 @@ func NewAuditLog(db *sql.DB) *AuditLog {
 	return &AuditLog{db: db}
 }
 
-// Record appends an entry to the audit trail.
+// appendEntry is the single writer for the audit trail. It acquires a
+// per-tenant advisory lock, reads the previous row_hash, computes the new
+// row_hash, and inserts the new row—all within one transaction. This
+// guarantees that concurrent writers for the same tenant serialize and the
+// hash chain never forks.
+func (a *AuditLog) appendEntry(
+	ctx context.Context,
+	tenantID string,
+	sessionID string,
+	toolName string,
+	params any,
+	result any,
+	decision string,
+	errMsg string,
+) error {
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return fmt.Errorf("audit: marshal params: %w", err)
+	}
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("audit: marshal result: %w", err)
+	}
+
+	return db.WithTenantTx(ctx, a.db, func(tx *sql.Tx) error {
+		// 1. Acquire a per-tenant advisory lock for the duration of the
+		// transaction. Concurrent writers for the same tenant block here
+		// until the previous transaction commits or rolls back.
+		// hashtext() maps the tenant UUID to a stable int4 lock key.
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, tenantID); err != nil {
+			return fmt.Errorf("audit: advisory lock: %w", err)
+		}
+
+		// 2. Read the previous row_hash for THIS tenant only. The ORDER BY
+		// id DESC and the tenant filter are both required: without the
+		// filter, a misconfigured RLS context could leak another tenant's
+		// hash; without the order, we would chain to the wrong row.
+		var prevHash string
+		err := tx.QueryRowContext(ctx, `
+			SELECT row_hash FROM audit_entries
+			WHERE tenant_id = $1
+			ORDER BY id DESC
+			LIMIT 1`, tenantID).Scan(&prevHash)
+		if err == sql.ErrNoRows {
+			prevHash = genesisHash
+		} else if err != nil {
+			return fmt.Errorf("audit: read prev_hash: %w", err)
+		}
+
+		// 3. Compute the new row_hash over (prev_hash || tenant || session ||
+		// tool || params || result || decision || errMsg).
+		h := sha256.New()
+		h.Write([]byte(prevHash))
+		h.Write([]byte(tenantID))
+		h.Write([]byte(sessionID))
+		h.Write([]byte(toolName))
+		h.Write(paramsJSON)
+		h.Write(resultJSON)
+		h.Write([]byte(decision))
+		if errMsg != "" {
+			h.Write([]byte(errMsg))
+		}
+		rowHash := hex.EncodeToString(h.Sum(nil))
+
+		// 4. Insert the new row within the same transaction. The advisory
+		// lock is released automatically on COMMIT/ROLLBACK.
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO audit_entries (tenant_id, session_id, tool_name, params, result, decision, prev_hash, row_hash)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			tenantID, sessionID, toolName, paramsJSON, resultJSON, decision, prevHash, rowHash,
+		); err != nil {
+			return fmt.Errorf("audit: insert: %w", err)
+		}
+		return nil
+	})
+}
+
+// Record appends a successful tool invocation to the audit trail.
 func (a *AuditLog) Record(ctx context.Context, tok *CapabilityToken, req ToolRequest, result any, decision, errMsg string) {
 	tenantID, err := db.TenantIDFromContext(ctx)
 	if err != nil {
 		// No tenant context means the request was rejected before reaching
-		// the gateway. Log to stderr and return; there is no tenant to
-		// attribute the audit entry to.
+		// the gateway. Nothing to attribute the entry to.
 		return
 	}
 
-	paramsJSON, _ := json.Marshal(req.Params)
-	resultJSON, _ := json.Marshal(result)
-
-	var prevHash string
-	_ = db.WithTenantTx(ctx, a.db, func(tx *sql.Tx) error {
-		err := tx.QueryRowContext(ctx, `
-			SELECT row_hash FROM audit_entries ORDER BY id DESC LIMIT 1`).Scan(&prevHash)
-		if err == sql.ErrNoRows {
-			prevHash = "0000000000000000000000000000000000000000000000000000000000000000"
-			return nil
-		}
-		return err
-	})
-
-	h := sha256.New()
-	h.Write([]byte(prevHash))
-	h.Write([]byte(tenantID))
-	h.Write([]byte(tok.SessionID))
-	h.Write([]byte(req.ToolName))
-	h.Write(paramsJSON)
-	h.Write(resultJSON)
-	h.Write([]byte(decision))
-	if errMsg != "" {
-		h.Write([]byte(errMsg))
+	if err := a.appendEntry(ctx, tenantID, tok.SessionID, req.ToolName, req.Params, result, decision, errMsg); err != nil {
+		log.Printf("audit: record failed: %v", err)
 	}
-	rowHash := hex.EncodeToString(h.Sum(nil))
-
-	_ = db.WithTenantTx(ctx, a.db, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `
-			INSERT INTO audit_entries (tenant_id, session_id, tool_name, params, result, decision, prev_hash, row_hash)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-			tenantID, tok.SessionID, req.ToolName, paramsJSON, resultJSON, decision, prevHash, rowHash)
-		return err
-	})
 }
 
 // Reject records a blocked tool invocation in the immutable audit trail.
-// The token was not verified, so the tenant is taken from the context (the
-// JWT middleware injects it before the Gateway is reached). If there is no
-// tenant context, the event cannot be attributed and is dropped.
+// The token was not verified, so the tenant comes from the context. If
+// there is no tenant context, the event cannot be attributed and is dropped.
 func (a *AuditLog) Reject(ctx context.Context, req ToolRequest, reason string) {
 	tenantID, err := db.TenantIDFromContext(ctx)
 	if err != nil {
-		// No tenant: cannot attribute the rejection. Log to stderr and return.
 		log.Printf("security: rejected %q without tenant context: %s", req.ToolName, reason)
 		return
 	}
 
-	// Build a minimal token-like structure for the hash chain.
-	// The session ID is unknown at rejection time, so use a synthetic marker.
 	sessionID := "rejected-" + time.Now().Format("20060102150405.000")
-
-	paramsJSON, _ := json.Marshal(req.Params)
-	resultJSON, _ := json.Marshal(map[string]string{
+	result := map[string]string{
 		"error":  reason,
 		"status": "blocked",
-	})
+	}
 
-	var prevHash string
-	_ = db.WithTenantTx(ctx, a.db, func(tx *sql.Tx) error {
-		err := tx.QueryRowContext(ctx, `
-			SELECT row_hash FROM audit_entries ORDER BY id DESC LIMIT 1`).Scan(&prevHash)
-		if err == sql.ErrNoRows {
-			prevHash = "0000000000000000000000000000000000000000000000000000000000000000"
-			return nil
-		}
-		return err
-	})
-
-	h := sha256.New()
-	h.Write([]byte(prevHash))
-	h.Write([]byte(tenantID))
-	h.Write([]byte(sessionID))
-	h.Write([]byte(req.ToolName))
-	h.Write(paramsJSON)
-	h.Write(resultJSON)
-	h.Write([]byte("blocked"))
-	rowHash := hex.EncodeToString(h.Sum(nil))
-
-	_ = db.WithTenantTx(ctx, a.db, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `
-			INSERT INTO audit_entries (tenant_id, session_id, tool_name, params, result, decision, prev_hash, row_hash)
-			VALUES ($1, $2, $3, $4, $5, 'blocked', $6, $7)`,
-			tenantID, sessionID, req.ToolName, paramsJSON, resultJSON, prevHash, rowHash)
-		return err
-	})
+	if err := a.appendEntry(ctx, tenantID, sessionID, req.ToolName, req.Params, result, "blocked", reason); err != nil {
+		log.Printf("audit: reject failed: %v", err)
+	}
 }
 
 // RecordAction records a non-tool action (e.g., order creation) in the
@@ -128,36 +145,5 @@ func (a *AuditLog) RecordAction(ctx context.Context, sessionID, action string, p
 	if err != nil {
 		return err
 	}
-
-	paramsJSON, _ := json.Marshal(params)
-	resultJSON, _ := json.Marshal(result)
-
-	var prevHash string
-	_ = db.WithTenantTx(ctx, a.db, func(tx *sql.Tx) error {
-		err := tx.QueryRowContext(ctx, `
-			SELECT row_hash FROM audit_entries ORDER BY id DESC LIMIT 1`).Scan(&prevHash)
-		if err == sql.ErrNoRows {
-			prevHash = "0000000000000000000000000000000000000000000000000000000000000000"
-			return nil
-		}
-		return err
-	})
-
-	h := sha256.New()
-	h.Write([]byte(prevHash))
-	h.Write([]byte(tenantID))
-	h.Write([]byte(sessionID))
-	h.Write([]byte(action))
-	h.Write(paramsJSON)
-	h.Write(resultJSON)
-	h.Write([]byte(decision))
-	rowHash := hex.EncodeToString(h.Sum(nil))
-
-	return db.WithTenantTx(ctx, a.db, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `
-			INSERT INTO audit_entries (tenant_id, session_id, tool_name, params, result, decision, prev_hash, row_hash)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-			tenantID, sessionID, action, paramsJSON, resultJSON, decision, prevHash, rowHash)
-		return err
-	})
+	return a.appendEntry(ctx, tenantID, sessionID, action, params, result, decision, "")
 }
