@@ -39,7 +39,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Note: the stack will not start without valid API keys. Get them at `console.groq.com` and `aistudio.google.com/ apikey`.
+Note: the stack will not start without valid API keys. Get them at `console.groq.com` and `aistudio.google.com/apikey`.
 
 Access the cockpit at `http://localhost:5173` and store at `http://localhost:5174` (log in as Acme Corp).
 
@@ -172,7 +172,7 @@ CHRONO_REDIS_ADDR=localhost:6379 \
 go test ./... -count=1
 ```
 
-**Coverage note:** the total statement coverage is 17.6%, but this number is misleading. The security-critical packages (`internal/security` 68%, `internal/breaker` 78%, `internal/db` 68%) are well covered. The lower total is driven by the integration test packages (`internal/transport/graph`, `internal/order`) and the modules that are tested via the red team harness in CI rather than `go test`. The red team harness covers the end-to-end security properties (RLS, Ed25519, idempotency, circuit breaker) with 5 deterministic scenarios.
+**Coverage note:** the total statement coverage is 17.6%, but this number is misleading. The security-critical packages (`internal/security` 68%, `internal/breaker` 78%, `internal/db` 68%) are well covered. The lower total is driven by the integration test packages (`internal/transport/graph`, `internal/order`) and the modules that are tested via the red team harness in CI rather than `go test`. The Red Team Harness runs from the cockpit. It can also run in CI via manual workflow dispatch (requires user-supplied API keys; see `.github/workflows/redteam.yml`). The CI pipeline runs the unit tests and the OWASP harness against a mocked provider.
 
 ### Coverage by layer
 
@@ -185,7 +185,7 @@ go test ./... -count=1
 | `internal/db` | TestStatementTimeoutAbortsSlowQuery | 10s query timeout |
 | `internal/transport/graph` | TestGraphQLTenantIsolationEndToEnd, TestInvokeToolWithCapabilityToken | Full HTTP → JWT → RLS → response |
 
-**Red team harness:** 5 OWASP-mapped scenarios run from the cockpit (RED TEAM → Run Full Suite) and from CI (`.github/workflows/redteam.yml`). 5/5 PASS in both.
+**Red team harness:** 5 OWASP-mapped scenarios run from the cockpit (RED TEAM → Run Full Suite). The CI pipeline runs the same scenarios against a mocked provider on every push; the workflow with real API keys is manual-only (see `.github/workflows/redteam.yml`). 5/5 PASS.
 
 ---
 
