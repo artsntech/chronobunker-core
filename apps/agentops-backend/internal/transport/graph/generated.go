@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -108,6 +109,7 @@ type ComplexityRoot struct {
 		InvokeTool        func(childComplexity int, input model.InvokeToolInput) int
 		LaunchMission     func(childComplexity int, input model.LaunchMissionInput) int
 		Login             func(childComplexity int, tenantID string) int
+		RegisterDeviceKey func(childComplexity int, input model.RegisterDeviceKeyInput) int
 		RunRedTeam        func(childComplexity int) int
 		UpdateAgentStatus func(childComplexity int, input model.UpdateAgentStatusInput) int
 	}
@@ -165,6 +167,7 @@ type MutationResolver interface {
 	RunRedTeam(ctx context.Context) (bool, error)
 	CreateOrder(ctx context.Context, input model.CreateOrderInput) (*order.Order, error)
 	LaunchMission(ctx context.Context, input model.LaunchMissionInput) (*model.MissionResult, error)
+	RegisterDeviceKey(ctx context.Context, input model.RegisterDeviceKeyInput) (bool, error)
 }
 type QueryResolver interface {
 	Agents(ctx context.Context) ([]*agent.Agent, error)
@@ -504,6 +507,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.Login(childComplexity, args["tenantId"].(string)), true
+	case "Mutation.registerDeviceKey":
+		if e.ComplexityRoot.Mutation.RegisterDeviceKey == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_registerDeviceKey_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.RegisterDeviceKey(childComplexity, args["input"].(model.RegisterDeviceKeyInput)), true
 	case "Mutation.runRedTeam":
 		if e.ComplexityRoot.Mutation.RunRedTeam == nil {
 			break
@@ -705,6 +719,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("InvokeAgentInput", ec.unmarshalInputInvokeAgentInput),
 			graphql.NewInputUnmarshaler("InvokeToolInput", ec.unmarshalInputInvokeToolInput),
 			graphql.NewInputUnmarshaler("LaunchMissionInput", ec.unmarshalInputLaunchMissionInput),
+			graphql.NewInputUnmarshaler("RegisterDeviceKeyInput", ec.unmarshalInputRegisterDeviceKeyInput),
 			graphql.NewInputUnmarshaler("UpdateAgentStatusInput", ec.unmarshalInputUpdateAgentStatusInput),
 		)
 	}
@@ -1179,6 +1194,20 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 		return nil, err
 	}
 	args["tenantId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_registerDeviceKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.RegisterDeviceKeyInput, error) {
+			return ec.unmarshalNRegisterDeviceKeyInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐRegisterDeviceKeyInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -2570,6 +2599,50 @@ func (ec *executionContext) fieldContext_Mutation_launchMission(ctx context.Cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_launchMission_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_registerDeviceKey(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_registerDeviceKey(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().RegisterDeviceKey(ctx, fc.Args["input"].(model.RegisterDeviceKeyInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_registerDeviceKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_registerDeviceKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4569,7 +4642,7 @@ func (ec *executionContext) unmarshalInputInvokeToolInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"agentId", "sessionId", "deviceId", "toolName", "params"}
+	fieldsInOrder := [...]string{"agentId", "sessionId", "deviceId", "toolName", "params", "signature", "timestamp"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -4611,6 +4684,20 @@ func (ec *executionContext) unmarshalInputInvokeToolInput(ctx context.Context, o
 				return it, err
 			}
 			it.Params = data
+		case "signature":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Signature = data
+		case "timestamp":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("timestamp"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Timestamp = data
 		}
 	}
 	return it, nil
@@ -4688,6 +4775,55 @@ func (ec *executionContext) unmarshalInputLaunchMissionInput(ctx context.Context
 func UnmarshalLaunchMissionInput(ctx context.Context, raw any) (model.LaunchMissionInput, error) {
 	var out model.LaunchMissionInput
 	err := graphql.UnmarshalNamedInputFromContext(ctx, "LaunchMissionInput", raw, &out)
+	return out, err
+}
+
+func (ec *executionContext) unmarshalInputRegisterDeviceKeyInput(ctx context.Context, obj any) (model.RegisterDeviceKeyInput, error) {
+	var it model.RegisterDeviceKeyInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"deviceId", "publicKey"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "deviceId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("deviceId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DeviceID = data
+		case "publicKey":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("publicKey"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PublicKey = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalRegisterDeviceKeyInput unmarshals raw into the RegisterDeviceKeyInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalRegisterDeviceKeyInput(ctx context.Context, raw any) (model.RegisterDeviceKeyInput, error) {
+	var out model.RegisterDeviceKeyInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "RegisterDeviceKeyInput", raw, &out)
 	return out, err
 }
 
@@ -5211,6 +5347,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "launchMission":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_launchMission(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "registerDeviceKey":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_registerDeviceKey(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -6072,6 +6215,11 @@ func (ec *executionContext) marshalNRedTeamResult2ᚖgithubᚗcomᚋartsntechᚋ
 	return ec._RedTeamResult(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNRegisterDeviceKeyInput2githubᚗcomᚋartsntechᚋchronobunkerᚑcoreᚋappsᚋagentopsᚑbackendᚋinternalᚋtransportᚋgraphᚋmodelᚐRegisterDeviceKeyInput(ctx context.Context, v any) (model.RegisterDeviceKeyInput, error) {
+	res, err := ec.unmarshalInputRegisterDeviceKeyInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -6310,6 +6458,24 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	_ = sel
 	_ = ctx
 	res := graphql.MarshalBoolean(*v)
+	return res
+}
+
+func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalInt(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.SelectionSet, v *int) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalInt(*v)
 	return res
 }
 

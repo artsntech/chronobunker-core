@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { gql } from '@apollo/client'
 import { useMutation } from '@apollo/client/react'
 import { Shield, Key, Server } from 'lucide-react'
+import { ensureDeviceKey } from '../lib/device'
 
 const LOGIN = gql`
   mutation Login($tenantId: ID!) {
@@ -10,6 +11,12 @@ const LOGIN = gql`
       tenantId
       deviceId
     }
+  }
+`
+
+const REGISTER_DEVICE_KEY = gql`
+  mutation RegisterDeviceKey($input: RegisterDeviceKeyInput!) {
+    registerDeviceKey(input: $input)
   }
 `
 
@@ -28,6 +35,7 @@ interface LoginProps {
 export const Login = ({ onLoginSuccess }: LoginProps) => {
   const [tenantId, setTenantId] = useState('11111111-1111-1111-1111-111111111111')
   const [login, { loading, error }] = useMutation(LOGIN)
+  const [registerDeviceKey] = useMutation(REGISTER_DEVICE_KEY)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,7 +45,28 @@ export const Login = ({ onLoginSuccess }: LoginProps) => {
       if (data?.login?.token) {
         localStorage.setItem('chrono_jwt', data.login.token)
         localStorage.setItem('chrono_tenant_id', data.login.tenantId)
-        localStorage.setItem('chrono_device_id', data.login.deviceId)  // NEW
+        localStorage.setItem('chrono_device_id', data.login.deviceId)
+
+        // Cryptographic device binding: generate an Ed25519 key pair in the
+        // browser and register the public key with the backend. On browsers
+        // without Web Crypto Ed25519, this logs a warning and the system
+        // falls back to DeviceID-only validation.
+        try {
+          console.log('[login] calling ensureDeviceKey')
+const state = await ensureDeviceKey(async (deviceId, publicKey) => {
+  console.log('[login] registering device key', deviceId, publicKey.slice(0, 10))
+  await registerDeviceKey({ variables: { input: { deviceId, publicKey } } })
+})
+console.log('[login] ensureDeviceKey returned', state)
+          if (!state.supported) {
+            console.warn(
+              '[login] this browser does not support Ed25519; device binding will use DeviceID only'
+            )
+          }
+        } catch (deviceErr) {
+          console.warn('[login] device key registration failed:', deviceErr)
+        }
+
         onLoginSuccess()
       }
     } catch (err) {

@@ -74,7 +74,7 @@ export const MissionLab = () => {
     )
   }
 
-  const handleLaunch = async () => {
+    const handleLaunch = async () => {
     if (selectedTools.length === 0) return
     setAuditLog([])
     setResult(null)

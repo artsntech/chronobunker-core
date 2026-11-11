@@ -25,6 +25,7 @@ type Resolver struct {
 	Classifier     *router.IntentClassifier
 	RedTeamHarness *redteam.Harness
 	OrderRepo      *order.Repository
+	Devices        *security.DeviceRegistry
 }
 
 type queryResolver struct{ *Resolver }

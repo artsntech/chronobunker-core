@@ -32,6 +32,8 @@ ChronoBunker is a working system, not a finished product. This document lists th
 - **`KNOWN_AGENT_IDS` is hardcoded.** The Tenant Isolation screen uses hardcoded agent IDs for the cross-tenant test.
 - **No dark/light mode toggle.** The cockpit is dark-only.
 
+o Firefox não persiste a chave privada no IndexedDB (Bugzilla WONTFIX), mas o device binding funciona durante a sessão.
+
 ## Testing
 
 - **No chaos tests.** No `chaos_test.go` simulating Kafka/Redis failures.

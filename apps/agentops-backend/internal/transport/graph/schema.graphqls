@@ -46,14 +46,6 @@ type InvokeAgentResult {
   latencyMs: Int!
 }
 
-input InvokeToolInput {
-  agentId: ID!
-  sessionId: String!
-  deviceId: String!
-  toolName: String!
-  params: JSON!
-}
-
 type InvokeToolResult {
   result: JSON!
   cached: Boolean!
@@ -171,4 +163,23 @@ type MissionResult {
 
 extend type Mutation {
   launchMission(input: LaunchMissionInput!): MissionResult!
+}
+
+input RegisterDeviceKeyInput {
+  deviceId: String!
+  publicKey: String!
+}
+
+extend type Mutation {
+  registerDeviceKey(input: RegisterDeviceKeyInput!): Boolean!
+}
+
+input InvokeToolInput {
+  agentId: ID!
+  sessionId: String!
+  deviceId: String!
+  toolName: String!
+  params: JSON!
+  signature: String
+  timestamp: Int
 }

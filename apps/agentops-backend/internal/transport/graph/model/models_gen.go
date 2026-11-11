@@ -57,6 +57,8 @@ type InvokeToolInput struct {
 	DeviceID  string         `json:"deviceId"`
 	ToolName  string         `json:"toolName"`
 	Params    map[string]any `json:"params"`
+	Signature *string        `json:"signature,omitempty"`
+	Timestamp *int           `json:"timestamp,omitempty"`
 }
 
 type InvokeToolResult struct {
@@ -100,6 +102,11 @@ type RedTeamResult struct {
 	Detail        string    `json:"detail"`
 	DurationMs    int       `json:"durationMs"`
 	RanAt         time.Time `json:"ranAt"`
+}
+
+type RegisterDeviceKeyInput struct {
+	DeviceID  string `json:"deviceId"`
+	PublicKey string `json:"publicKey"`
 }
 
 type Subscription struct {

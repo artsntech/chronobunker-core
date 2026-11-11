@@ -138,12 +138,24 @@ func (r *mutationResolver) InvokeTool(ctx context.Context, input model.InvokeToo
 		return nil, fmt.Errorf("issue token: %w", err)
 	}
 
-	toolResult, err := r.Gateway.Invoke(ctx, security.ToolRequest{
+	toolReq := security.ToolRequest{
 		SignedToken: signedToken,
 		DeviceID:    input.DeviceID,
 		ToolName:    input.ToolName,
 		Params:      input.Params,
-	})
+	}
+	// Optional cryptographic device binding: the browser signs the canonical
+	// payload with its registered Ed25519 private key. If the browser does not
+	// support Web Crypto Ed25519, these fields are nil and the Gateway falls
+	// back to DeviceID-only validation (documented in limitations.md).
+	if input.Signature != nil {
+		toolReq.Signature = *input.Signature
+	}
+	if input.Timestamp != nil {
+		toolReq.Timestamp = int64(*input.Timestamp)
+	}
+
+	toolResult, err := r.Gateway.Invoke(ctx, toolReq)
 	if err != nil {
 		return nil, err
 	}
@@ -426,4 +438,14 @@ func (r *mutationResolver) LaunchMission(ctx context.Context, input model.Launch
 		ActionsBlocked:  blocked,
 		TotalSpentUsd:   input.BudgetUsd,
 	}, nil
+}
+
+func (r *mutationResolver) RegisterDeviceKey(ctx context.Context, input model.RegisterDeviceKeyInput) (bool, error) {
+	if r.Devices == nil {
+		return false, fmt.Errorf("device registry not configured")
+	}
+	if err := r.Devices.Register(ctx, input.DeviceID, input.PublicKey); err != nil {
+		return false, fmt.Errorf("register device key: %w", err)
+	}
+	return true, nil
 }

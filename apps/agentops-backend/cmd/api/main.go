@@ -231,6 +231,7 @@ func main() {
 			Classifier:     classifier,
 			RedTeamHarness: redTeamHarness,
 			OrderRepo:      order.NewRepository(database, auditLog),
+			Devices: security.NewDeviceRegistry(database),
 		},
 	})
 
