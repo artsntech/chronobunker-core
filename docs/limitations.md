@@ -11,19 +11,19 @@ ChronoBunker is a working system, not a finished product. This document lists th
 
 ## AI / Agent layer
 
-- **Groq and Gemini are the only implemented providers.** The `routing.yaml` references OpenAI, Anthropic, and Gemini, but only Groq and Gemini adapters exist. OpenAI and Anthropic are not implemented. A fallback to OpenAI would fail with `provider not implemented`.
+- **Groq and Gemini are the only implemented providers.** The `routing.yaml` references only these two. OpenAI and Anthropic are not implemented: the `Provider` interface is ready to accept an adapter, but there are no API keys available in the development environment to exercise the adapter against the real API. An unimplemented fallback to OpenAI would fail with `no provider for prefix "openai"`.
 - **No semantic caching.** The `pgvector` extension is not enabled. Every request hits the LLM.
 - **No prompt registry or A/B testing.** Prompts are hardcoded in the agent's `system_prompt` column.
 - **Single-agent execution.** The system invokes one agent per request. No planner, no multi-agent orchestration.
 
 ## Security
 
-- **No SSO/SAML.** Authentication is JWT-only. Enterprises require SSO.
-- **No SIEM export.** Audit events live in Postgres. A production deployment must export them to Splunk, Datadog, or Elastic.
+- **No SSO/SAML in the Core.** Authentication is JWT-only. Enterprises require SSO. The Enterprise edition provides OIDC/SAML federation.
+- **No SIEM export in the Core.** Audit events live in Postgres. A production deployment must export them to Splunk, Datadog, or Elastic. The Enterprise edition provides a CEF exporter.
 - **Red team runs on push/PR, not as a pre-commit hook.** A developer can commit a regression locally without seeing the red team fail until the PR is pushed.
-- **Device binding is stubbed.** The `DeviceID` claim is validated, but the client does not generate an ephemeral key pair.
+- **Device binding is stubbed.** The `DeviceID` claim is validated, but the client does not generate an ephemeral key pair. The `[ ] Cryptographic device binding` item in the roadmap tracks this.
 - **No PII detection.** The output sanitizer strips HTML but does not detect PII in LLM responses.
-- **No revocation list.** A stolen Ed25519 token is valid for its full 5-minute TTL. There is no way to revoke it early.
+- **No revocation list in the Core.** A stolen Ed25519 token is valid for its full 5-minute TTL. The Enterprise edition provides sub-millisecond Redis Pub/Sub revocation for API keys.
 
 ## Frontend
 
@@ -42,4 +42,4 @@ ChronoBunker is a working system, not a finished product. This document lists th
 
 - **No pre-built registry images.** Multi-stage `Dockerfile`s and `docker-compose.yml` are included for local and self-hosted builds, but pre-built images are not yet published to Docker Hub or GHCR.
 - **No Terraform.** No infrastructure-as-code for GCP, AWS, or Oracle Cloud.
-- **No multi-region.** No failover, no replication, no global load balancing.
+- **No multi-region.** No failover, no replication, no global load balancing. The Enterprise edition provides multi-region failover with distributed leader election.
