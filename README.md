@@ -144,7 +144,7 @@ ChronoBunker assumes the LLM is hostile, the frontend is compromised, and the ne
 | :--- | :--- | :--- |
 | **Postgres RLS** | Cross-tenant data leaks | FORCE ROW LEVEL SECURITY on every tenant-scoped table |
 | **JWT RS256** | Token forgery | Algorithm pinning, audience validation, expiration required |
-| **Ed25519 Capability Tokens** | Unauthorized tool execution | 5-min TTL, scoped to tools and resource IDs, DeviceID validated |
+| **Ed25519 Capability Tokens** | Unauthorized tool execution | 5-min TTL, scoped to tools and resource IDs, DeviceID validated (cryptographic device binding is on the roadmap) |
 | **3-Phase Idempotency** | Duplicate side effects | RESERVE → EXECUTE → COMMIT with ON CONFLICT DO NOTHING |
 | **Circuit Breaker FSM** | Cascading LLM outages | CLOSED → OPEN → HALF_OPEN with exponential backoff |
 | **Provider Fallback Chain** | Single-provider outage | Groq primary, Gemini fallback, per-route policy in `routing.yaml` |

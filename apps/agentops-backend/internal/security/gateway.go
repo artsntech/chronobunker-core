@@ -19,6 +19,8 @@ type ToolRequest struct {
 	DeviceID    string // NEW: must match the token's DeviceID claim
 	ToolName    string
 	Params      map[string]any
+	Signature   string // NEW: base64url Ed25519 signature over SignedPayload
+	Timestamp   int64  // NEW: Unix seconds, must be within 30s of server time
 }
 
 // ToolResponse is the result of a tool invocation.
@@ -38,6 +40,7 @@ type Gateway struct {
 	execute Executor
 	idm     *IdempotencyEngine
 	audit   *AuditLog
+	devices *DeviceRegistry
 }
 
 // NewGateway constructs a Gateway.
@@ -48,6 +51,7 @@ func NewGateway(db *sql.DB, tokens *TokenService, execute Executor) *Gateway {
 		execute: execute,
 		idm:     NewIdempotencyEngine(db),
 		audit:   NewAuditLog(db),
+		devices: NewDeviceRegistry(db),
 	}
 }
 
@@ -73,6 +77,23 @@ func (g *Gateway) Invoke(ctx context.Context, req ToolRequest) (*ToolResponse, e
 	if tok.DeviceID != "" && req.DeviceID != tok.DeviceID {
 		g.audit.Reject(ctx, req, "device_mismatch")
 		return nil, errors.New("gateway: device ID does not match session")
+	}
+
+	// Step 2.5: Cryptographic device binding.
+	// The signature proves that the request was signed by the private key that
+	// corresponds to the public key registered for this device. A stolen JWT
+	// plus a stolen DeviceID is not enough to invoke a tool.
+	paramsJSON, _ := json.Marshal(req.Params)
+	signed := SignedPayload{
+		SessionID: tok.SessionID,
+		ToolName:  req.ToolName,
+		DeviceID:  req.DeviceID,
+		Params:    paramsJSON,
+		Timestamp: req.Timestamp,
+	}
+	if err := g.devices.Verify(ctx, signed, req.Signature); err != nil {
+		g.audit.Reject(ctx, req, "device_signature_invalid")
+		return nil, fmt.Errorf("gateway: %w", err)
 	}
 
 	// ── Step 2: Tool must be in the token's allowed list.
