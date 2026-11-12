@@ -7,7 +7,7 @@ ChronoBunker is a working system, not a finished product. This document lists th
 - **Single-node.** No horizontal scaling, no multi-region, no leader election. The `audit.Hub` and the `breaker` assume one process. A production deployment needs Redis Cluster or Postgres advisory locks.
 - **No TLS termination in the binary.** The Go server speaks HTTP. TLS must be terminated upstream (Nginx, Cloud Run, Fly.io).
 - **No Kubernetes manifests.** Local development uses portable binaries (PostgreSQL, Redis, Jaeger). K8s is on the roadmap.
-- **OTLP tracing verified locally with Jaeger, not in CI.** The exporter is wired in `main.go` and spans are visible in Jaeger (`http://localhost:16686`), but the CI pipeline does not yet spin up a Jaeger instance. A future step would add Jaeger as a service in the GitHub Actions workflow.
+- **OTLP tracing verified locally with Jaeger, not in CI.** The exporter is wired in `main.go`, the HTTP mux is wrapped with `otelhttp`, and W3C `traceparent` propagation is enabled. The Enterprise Gateway injects `traceparent` into its outbound calls to the Core, and Jaeger shows a single trace spanning both services (17+ spans, 2 services). The CI pipeline does not yet spin up a Jaeger instance.
 
 ## AI / Agent layer
 
@@ -31,8 +31,6 @@ ChronoBunker is a working system, not a finished product. This document lists th
 - **No replay or time machine.** The audit trail shows events, but there is no causal reconstruction.
 - **`KNOWN_AGENT_IDS` is hardcoded.** The Tenant Isolation screen uses hardcoded agent IDs for the cross-tenant test.
 - **No dark/light mode toggle.** The cockpit is dark-only.
-
-o Firefox não persiste a chave privada no IndexedDB (Bugzilla WONTFIX), mas o device binding funciona durante a sessão.
 
 ## Testing
 
