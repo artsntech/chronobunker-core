@@ -114,8 +114,18 @@ func (r *DeviceRegistry) Verify(ctx context.Context, signed SignedPayload, signa
 		return ErrDeviceSignatureInvalid
 	}
 
-	// 3. Reconstruct the canonical payload bytes and verify the signature.
-	canonical, err := json.Marshal(signed)
+	// 3. Reconstruct the canonical payload bytes. Go's json.Marshal orders
+	//    map keys alphabetically, which matches the browser's canonicalJSON.
+	//    Using a map[string]any instead of the struct ensures the top-level
+	//    keys are sorted, not in struct declaration order.
+	canonicalPayload := map[string]any{
+		"session_id": signed.SessionID,
+		"tool_name":  signed.ToolName,
+		"device_id":  signed.DeviceID,
+		"params":     signed.Params, // json.RawMessage is preserved byte-for-byte
+		"ts":         signed.Timestamp,
+	}
+	canonical, err := json.Marshal(canonicalPayload)
 	if err != nil {
 		return fmt.Errorf("security: marshal payload: %w", err)
 	}

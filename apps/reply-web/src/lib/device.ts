@@ -103,8 +103,21 @@ export async function ensureDeviceKey(
   return { supported: true, deviceId, publicKeyB64 }
 }
 
-// signToolCall signs the canonical payload that the Gateway reconstructs.
-// Returns null if the browser does not support Ed25519 or no key exists.
+// canonicalJSON serializes an object with keys sorted alphabetically at every
+// level, matching Go's encoding/json behavior for maps. This ensures the
+// browser and the Go verifier produce identical bytes for the same payload.
+function canonicalJSON(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value)
+  }
+  if (Array.isArray(value)) {
+    return '[' + value.map(canonicalJSON).join(',') + ']'
+  }
+  const obj = value as Record<string, unknown>
+  const keys = Object.keys(obj).sort()
+  return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalJSON(obj[k])).join(',') + '}'
+}
+
 export async function signToolCall(
   sessionId: string,
   toolName: string,
@@ -115,7 +128,7 @@ export async function signToolCall(
   if (!privateKey) return null
 
   const timestamp = Math.floor(Date.now() / 1000)
-  const canonical = JSON.stringify({
+  const canonical = canonicalJSON({
     session_id: sessionId,
     tool_name: toolName,
     device_id: deviceId,
