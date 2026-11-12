@@ -4,9 +4,10 @@
 // backend and exits with code 1 if any scenario fails.
 //
 // Usage:
-//   CHRONO_REDTEAM_API_URL=http://localhost:8080/query \
-//   CHRONO_REDTEAM_JWT_SECRET=../../secrets/jwt_private.pem \
-//   go run scripts/redteam_ci.go
+//
+//	CHRONO_REDTEAM_API_URL=http://localhost:8080/query \
+//	CHRONO_REDTEAM_JWT_SECRET=../../secrets/jwt_private.pem \
+//	go run scripts/redteam_ci.go
 package main
 
 import (
