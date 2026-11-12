@@ -77,7 +77,7 @@ Eight screens, each corresponding to a real backend guarantee. Every event is re
 | Screen | What it proves |
 | :--- | :--- |
 | **Agent Monitor** | Runtime telemetry (goroutines, heap, GC), latency chart, cost ledger, breaker state, kill switch, live audit stream |
-| **Security Intercept** | Ed25519 blocks unauthorized tools (issue_refund outside allowedTools), audit trail records the block |
+| **Security Intercept** | Ed25519 capability token + device signature blocks unauthorized tools (`issue_refund` outside `allowedTools`), audit trail records the block |
 | **Breaker Lab** | Circuit breaker opens after 5 real failures, 6th request short-circuited in ~11ms |
 | **Tenant Isolation** | Postgres RLS blocks cross-tenant access at the engine level, returns null |
 | **Audit Trail** | SHA-256 hash chain verified in a Web Worker, tampering detection |
@@ -144,7 +144,7 @@ ChronoBunker assumes the LLM is hostile, the frontend is compromised, and the ne
 | :--- | :--- | :--- |
 | **Postgres RLS** | Cross-tenant data leaks | FORCE ROW LEVEL SECURITY on every tenant-scoped table |
 | **JWT RS256** | Token forgery | Algorithm pinning, audience validation, expiration required |
-| **Ed25519 Capability Tokens** | Unauthorized tool execution | 5-min TTL, scoped to tools and resource IDs, DeviceID validated (cryptographic device binding is on the roadmap) |
+| **Ed25519 Capability Tokens + Device Binding** | Unauthorized tool execution, stolen token replay | 5-min TTL, scoped to tools and resource IDs. Each request signed with a non-extractable Ed25519 private key generated in the browser; server verifies against the registered public key. |
 | **3-Phase Idempotency** | Duplicate side effects | RESERVE → EXECUTE → COMMIT with ON CONFLICT DO NOTHING |
 | **Circuit Breaker FSM** | Cascading LLM outages | CLOSED → OPEN → HALF_OPEN with exponential backoff |
 | **Provider Fallback Chain** | Single-provider outage | Groq primary, Gemini fallback, per-route policy in `routing.yaml` |
@@ -282,7 +282,7 @@ chronobunker-core/
 
 * [x] Multi-tenant RLS with Postgres engine enforcement
 * [x] JWT RS256 with algorithm pinning and audience
-* [x] Ed25519 capability tokens with DeviceID validation
+* [x] Ed25519 capability tokens with cryptographic device binding (browser-generated key pair, signed requests)
 * [x] 3-phase idempotency (exactly-once side effects)
 * [x] Circuit breaker FSM with Redis state
 * [x] Groq LLM integration (openai/gpt-oss-120b)

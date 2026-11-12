@@ -32,12 +32,13 @@ jwt.WithExpirationRequired(),
 - **Mitigation:** the parser rejects any token not signed with RS256 by the correct issuer, for the correct audience, and not expired.
 - **Test:** `TestGraphQLTenantIsolationEndToEnd` in `internal/transport/graph/e2e_test.go`.
 
-## Layer 3: Ed25519 capability tokens
+## Layer 3: Ed25519 capability tokens with cryptographic device binding
 
-Ephemeral tokens with 5-minute TTL, scoped to specific tools, resources, and device.
+Ephemeral tokens with 5-minute TTL, scoped to specific tools, resources, and device. The device binding is cryptographic: the browser generates a non-extractable Ed25519 key pair on first login, registers the public key with the server, and signs every `invokeTool` request. The server verifies the signature against the registered public key before executing any tool.
 
-- **Threat:** unauthorized tool execution, prompt-injected tool abuse.
-- **Mitigation:** the Tool Gateway validates signature, expiration, tenant match, tool scope, resource binding, amount limit, and device binding.
+- **Threat:** unauthorized tool execution, prompt-injected tool abuse, stolen token replay from another device.
+- **Mitigation:** the Tool Gateway validates signature, expiration, tenant match, tool scope, resource binding, amount limit, and device signature. A stolen token cannot be used from a different device because the attacker does not have the private key.
+- **Canonicalization:** the signed payload uses alphabetically-sorted JSON keys on both sides (browser `canonicalJSON` and Go `json.Marshal` of `map[string]any`). Without this, the order of `params` keys would differ between the two runtimes and the signature would fail.
 - **Test:** `TestGatewayRejectsCrossTenantResourceBinding`, `TestGatewayIsIdempotentOnRetry`, `TestGatewayRejectsDeviceMismatch`.
 - **ADR:** 003.
 

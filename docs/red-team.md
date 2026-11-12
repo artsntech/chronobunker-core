@@ -67,3 +67,7 @@ Add a new scenario to `internal/redteam/harness.go`:
 ```
 
 Then implement yourTestFunction with a deterministic assertion. The harness publishes the result via WebSocket automatically.
+
+## What the harness does not cover
+
+The device binding (browser-generated Ed25519 key pair, signed `invokeTool` requests) is exercised by the Security Intercept screen in the cockpit and by the `device_binding.go` integration test. It is not in the red team harness because the harness runs headless (no Web Crypto available). A future step would add a headless-browser scenario (Playwright) that generates the key pair, signs a request, and verifies the server accepts it.
