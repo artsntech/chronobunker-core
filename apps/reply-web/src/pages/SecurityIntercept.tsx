@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { gql } from '@apollo/client'
 import { useQuery, useMutation, useSubscription } from '@apollo/client/react'
 import { ShieldAlert, ShieldCheck, Lock, AlertTriangle, ExternalLink } from 'lucide-react'
+import { signToolCall, getDeviceId } from '../lib/device'
 
 const GET_AGENTS = gql`
   query GetAgentsForIntercept {
@@ -113,10 +114,23 @@ export const SecurityIntercept = () => {
   const handleAttempt = async () => {
     if (!selectedAgent) return
 
-    const deviceId = localStorage.getItem('chrono_device_id') || 'web-device-fallback'
+    const deviceId = getDeviceId()
     const toolIsAllowed = selectedAgent.allowedTools.includes(UNAUTHORIZED_TOOL)
 
+    const params = {
+      order_id: 'ORD-9999',
+      amount: 50.0,
+      reason: 'simulated unauthorized attempt',
+    }
+
+    // Cryptographic device binding: sign the canonical payload with the
+    // device's Ed25519 private key. If the browser does not support Ed25519,
+    // signToolCall returns null and the request is sent without a signature
+    // (the Gateway will reject with device_signature_invalid).
+    const signed = await signToolCall(sessionId, UNAUTHORIZED_TOOL, deviceId, params)
+
     try {
+      console.log('[intercept] canonical payload:', signed)
       const res = await invokeTool({
         variables: {
           input: {
@@ -124,11 +138,8 @@ export const SecurityIntercept = () => {
             sessionId,
             deviceId,
             toolName: UNAUTHORIZED_TOOL,
-            params: {
-              order_id: 'ORD-9999',
-              amount: 50.0,
-              reason: 'simulated unauthorized attempt',
-            },
+            params,
+            ...(signed ?? {}),
           },
         },
       })
