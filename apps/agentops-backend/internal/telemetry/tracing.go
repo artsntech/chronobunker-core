@@ -9,6 +9,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
@@ -55,6 +56,15 @@ func InitTracer() (shutdown func(context.Context) error) {
 		sdktrace.WithResource(res),
 	)
 	otel.SetTracerProvider(tp)
+
+	// Propagate W3C TraceContext and Baggage headers. Without this, the
+	// otelhttp middleware cannot extract the traceparent header sent by the
+	// Enterprise Gateway, and the Core's spans are orphaned from the Gateway's
+	// trace. With it, the Jaeger UI shows a single trace spanning both services.
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
 
 	log.Printf("telemetry: OTLP tracing enabled, exporting to %s", endpoint)
 

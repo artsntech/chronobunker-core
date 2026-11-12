@@ -39,6 +39,8 @@ import (
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/telemetry"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/graph"
 	"github.com/artsntech/chronobunker-core/apps/agentops-backend/internal/transport/middleware"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
@@ -320,9 +322,23 @@ func main() {
 		),
 	)
 
+	// Wrap the entire HTTP handler with otelhttp so that every inbound request
+	// (POST /query, GET /healthz, etc.) creates a server span, extracts the
+	// traceparent header from the client (the Enterprise Gateway), and propagates
+	// the trace context to any outbound calls (e.g., LLM providers).
+	//
+	// The span name is derived from the route pattern, not the raw path, to keep
+	// the Jaeger UI low-cardinality. Without otelhttp, the Core has no HTTP
+	// server spans and the traceparent is ignored.
+	otelHandler := otelhttp.NewHandler(handlerWithHeaders, "chronobunker-api",
+		otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+			return r.Method + " " + r.URL.Path
+		}),
+	)
+
 	httpSrv := &http.Server{
 		Addr:              ":8080",
-		Handler:           handlerWithHeaders,
+		Handler:           otelHandler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
