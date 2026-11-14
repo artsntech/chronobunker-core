@@ -9,6 +9,7 @@ The system has **two frontends**: a **Control Plane** (the operations cockpit fo
 [![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)](https://go.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-336791?logo=postgresql)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
+[![CI](https://github.com/artsntech/chronobunker-core/actions/workflows/ci.yml/badge.svg)](https://github.com/artsntech/chronobunker-core/actions/workflows/ci.yml)
 
 🎥 **[Watch the 3-minute demo]** — See the cockpit, the Bunker Store, the Mission Lab, and the Red Team Harness in action.
 
