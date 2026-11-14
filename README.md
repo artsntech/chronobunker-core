@@ -223,7 +223,7 @@ The core is free and self-hosted. The enterprise tier adds what large organizati
 | SLA-backed support | ❌ | ✅ |
 | EU AI Act compliance reporting | ❌ | ✅ |
 
-**The Enterprise Edition is now available:** [ChronoBunker Enterprise](https://github.com/artsntech/chronobunker-enterprise) — OpenAI/MCP proxy, sub-ms revocation, EU AI Act dossier, Enterprise Console. Commercial license.
+**[ChronoBunker Enterprise](https://github.com/artsntech/chronobunker-enterprise)** — OpenAI/MCP proxy, sub-ms revocation, EU AI Act dossier, Enterprise Console, War Room. Commercial license.
 
 Why open core? The free tier builds adoption; the enterprise tier pays the bills.
 
